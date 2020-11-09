@@ -42,7 +42,7 @@ let loc (startpos:Lexing.position) (endpos:Lexing.position) (elt:'a) : 'a node =
 %token AND      /* & */
 %token OR       /* | */
 %token BAND     /* [&] */
-%token BOR      /* [!] */
+%token BOR      /* [|] */
 %token SLEFT    /* << */
 %token SRIGHT   /* >> */
 %token SARRI    /* >>> */
