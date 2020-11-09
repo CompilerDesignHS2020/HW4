@@ -24,6 +24,7 @@ let loc (startpos:Lexing.position) (endpos:Lexing.position) (elt:'a) : 'a node =
 %token WHILE    /* while */
 %token RETURN   /* return */
 %token VAR      /* var */
+%token NEW      /* new */
 %token SEMI     /* ; */
 %token COMMA    /* , */
 %token LBRACE   /* { */
@@ -134,6 +135,7 @@ gexp:
   | i=INT      { loc $startpos $endpos @@ CInt i }
   | TRUE      { loc $startpos $endpos @@ CBool true }
   | FALSE      { loc $startpos $endpos @@ CBool false }
+  | NEW t=ty LBRACKET RBRACKET LBRACE es=separated_list(COMMA, gexp) RBRACE { loc $startpos $endpos @@ CArr (t, es) }
 
 lhs:  
   | id=IDENT            { loc $startpos $endpos @@ Id id }
@@ -141,13 +143,16 @@ lhs:
                         { loc $startpos $endpos @@ Index (e, i) }
 
 exp:
+  | id=IDENT            { loc $startpos $endpos @@ Id id }
   | i=INT               { loc $startpos $endpos @@ CInt i }
   | t=rtyp NULL           { loc $startpos $endpos @@ CNull t }
   | TRUE              { loc $startpos $endpos @@ CBool true}
   | FALSE              { loc $startpos $endpos @@ CBool false}
+  | NEW t=ty LBRACKET RBRACKET LBRACE es=separated_list(COMMA, gexp) RBRACE { loc $startpos $endpos @@ CArr (t, es) }
+  | NEW TINT LBRACKET e=exp RBRACKET { loc $startpos $endpos @@ NewArr (TInt, e)}
+  | NEW TBOOL LBRACKET e=exp RBRACKET { loc $startpos $endpos @@ NewArr (TBool, e)}
   | e1=exp b=bop e2=exp { loc $startpos $endpos @@ Bop (b, e1, e2) }
   | u=uop e=exp         { loc $startpos $endpos @@ Uop (u, e) }
-  | id=IDENT            { loc $startpos $endpos @@ Id id }
   | e=exp LBRACKET i=exp RBRACKET
                         { loc $startpos $endpos @@ Index (e, i) }
   | e=exp LPAREN es=separated_list(COMMA, exp) RPAREN

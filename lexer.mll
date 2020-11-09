@@ -39,6 +39,7 @@
   ("return", RETURN);
   ("var", VAR);
   ("global", GLOBAL);
+  ("new", NEW);
 
   (* Symbols *)
   ( ";", SEMI);
