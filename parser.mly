@@ -148,7 +148,7 @@ exp:
   | t=rtyp NULL           { loc $startpos $endpos @@ CNull t }
   | TRUE              { loc $startpos $endpos @@ CBool true}
   | FALSE              { loc $startpos $endpos @@ CBool false}
-  | NEW t=ty LBRACKET RBRACKET LBRACE es=separated_list(COMMA, gexp) RBRACE { loc $startpos $endpos @@ CArr (t, es) }
+  | NEW t=ty LBRACKET RBRACKET LBRACE es=separated_list(COMMA, exp) RBRACE { loc $startpos $endpos @@ CArr (t, es) }
   | NEW TINT LBRACKET e=exp RBRACKET { loc $startpos $endpos @@ NewArr (TInt, e)}
   | NEW TBOOL LBRACKET e=exp RBRACKET { loc $startpos $endpos @@ NewArr (TBool, e)}
   | e1=exp b=bop e2=exp { loc $startpos $endpos @@ Bop (b, e1, e2) }
