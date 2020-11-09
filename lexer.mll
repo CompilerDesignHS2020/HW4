@@ -157,7 +157,7 @@ and directive state = parse
                 directive 1 lexbuf)
              else if state = 2 then directive 3 lexbuf
              else raise (Lexer_error (lex_long_range lexbuf,
-               Printf.sprintf 'Illegal directives')) }
+               Printf.sprintf "Illegal directives")) }
   | '"' { if state = 1 then
             begin
               reset_str(); 
