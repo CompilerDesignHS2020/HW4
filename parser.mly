@@ -136,6 +136,7 @@ gexp:
   | TRUE      { loc $startpos $endpos @@ CBool true }
   | FALSE      { loc $startpos $endpos @@ CBool false }
   | NEW t=ty LBRACKET RBRACKET LBRACE es=separated_list(COMMA, gexp) RBRACE { loc $startpos $endpos @@ CArr (t, es) }
+  | s=STRING    { loc $startpos $endpos @@ CStr s }
 
 lhs:  
   | id=IDENT            { loc $startpos $endpos @@ Id id }
@@ -148,6 +149,7 @@ exp:
   | t=rtyp NULL           { loc $startpos $endpos @@ CNull t }
   | TRUE              { loc $startpos $endpos @@ CBool true}
   | FALSE              { loc $startpos $endpos @@ CBool false}
+  | s=STRING    { loc $startpos $endpos @@ CStr s }
   | NEW t=ty LBRACKET RBRACKET LBRACE es=separated_list(COMMA, exp) RBRACE { loc $startpos $endpos @@ CArr (t, es) }
   | NEW TINT LBRACKET e=exp RBRACKET { loc $startpos $endpos @@ NewArr (TInt, e)}
   | NEW TBOOL LBRACKET e=exp RBRACKET { loc $startpos $endpos @@ NewArr (TBool, e)}
