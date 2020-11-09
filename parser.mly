@@ -22,6 +22,7 @@ let loc (startpos:Lexing.position) (endpos:Lexing.position) (elt:'a) : 'a node =
 %token IF       /* if */
 %token ELSE     /* else */
 %token WHILE    /* while */
+%token FOR      /* for */
 %token RETURN   /* return */
 %token VAR      /* var */
 %token NEW      /* new */
@@ -174,6 +175,8 @@ stmt:
   | RETURN e=exp SEMI   { loc $startpos $endpos @@ Ret(Some e) }
   | WHILE LPAREN e=exp RPAREN b=block  
                         { loc $startpos $endpos @@ While(e, b) } 
+  | FOR LPAREN es=separated_list(COMMA, vdecl) SEMI e=exp? SEMI s=stmt? RPAREN b=block  
+                        { loc $startpos $endpos @@ For(es, e, s, b) } 
 
 block:
   | LBRACE stmts=list(stmt) RBRACE { stmts }
