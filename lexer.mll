@@ -56,6 +56,18 @@
   ( ")", RPAREN);
   ( "[", LBRACKET);
   ( "]", RBRACKET);
+  ( "!=", NEQEQ);
+  ( "<", LTHEN);   
+  ( "<=", LTEQ);
+  ( ">", GTHAN); 
+  ( ">=", GTEQ);
+  ( "&", AND); 
+  ( "|", OR); 
+  ( "[&]",BAND); 
+  ( "[!]",BOR); 
+  ( "<<", SLEFT);
+  ( ">>", SRIGHT);
+  ( ">>>",SARRI); 
   ]
 
 let (symbol_table : (string, Parser.token) Hashtbl.t) = Hashtbl.create 1024
