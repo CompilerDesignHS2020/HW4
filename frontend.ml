@@ -305,7 +305,15 @@ let oat_alloc_array (t:Ast.ty) (size:Ll.operand) : Ll.ty * operand * stream =
 *)
 
 let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
-  failwith "cmp_exp unimplemented"
+  match exp.elt with
+  | CNull(r) -> let uid = gensym "sucuk" in (I64,Ll.Id(uid), [E(uid, Binop(Add, Ptr(cmp_rty r), Const(0L), Const(0L)))] )
+  | CBool(bo) -> let b = if bo then 1L else 0L in let uid = gensym "sucuk" in(I1,Ll.Id(uid), [E(uid, Binop(Add, I1, Const(0L), Const(b)))] )
+  | CInt(i) -> let uid = gensym "sucuk" in (I64,Ll.Id(uid), [E(uid, Binop(Add, I64, Const(0L), Const(i)))] )
+  | CStr(s) -> let uid = gensym "sucuk" in 
+              (I64,Ll.Id(uid), 
+              [E(uid, Binop(Add, I64, Const(0L), Const(i)))] )
+  | _ -> ()
+  | _ -> failwith "ur an fagit"
 
 (* Compile a statement in context c with return typ rt. Return a new context, 
    possibly extended with new local bindings, and the instruction stream
