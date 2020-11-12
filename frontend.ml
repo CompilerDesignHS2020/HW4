@@ -366,18 +366,21 @@ let cmp_function_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
    in well-formed programs. (The constructors starting with C). 
 *)
 let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
-  let rec rec_gctxt rem_prog =
+  let rec rec_gctxt (rem_prog:Ast.prog) :Ctxt.t =
     begin match rem_prog with
-      | h::tl -> c.Add (begin match h with
-          | gfdecl -> 
-          | gvdecl -> 
-          
-        end)
+      | h::tl -> 
+        let new_decl = begin match h with
+          | Gvdecl n -> []
+          | Gfdecl n -> []
+        end
+      in new_decl@(rec_gctxt tl)
       | [] -> []
     end
   in
 
-  rec_gctxt c 
+  (**
+  (rec_gctxt c)@c 
+   *)
 
 
 
