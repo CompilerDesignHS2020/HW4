@@ -379,7 +379,7 @@ let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
     begin match rem_prog with
       | h::tl -> 
         let new_decl = begin match h with
-          | Gvdecl n -> (n.elt.name, (cmp_ty n.elt.init.elt))
+          | Gvdecl n -> [(n.elt.name, (cmp_ty (ast_type_of_ast_exp n.elt.init.elt), Gid n.elt.name))]
           | Gfdecl n -> []
         end
       in new_decl@(rec_gctxt tl)
