@@ -51,6 +51,7 @@ let loc (startpos:Lexing.position) (endpos:Lexing.position) (elt:'a) : 'a node =
 %token RPAREN   /* ) */
 %token LBRACKET /* [ */
 %token RBRACKET /* ] */
+%token CBRACKET /* [] */
 %token TILDE    /* ~ */
 %token BANG     /* ! */
 %token GLOBAL   /* global */
@@ -113,7 +114,7 @@ ty:
 
 %inline rtyp:
   | TSTRING { RString }
-  | t=ty LBRACKET RBRACKET { RArray t }
+  | t=ty CBRACKET { RArray t }
 
 %inline bop:
   | PLUS   { Add }
@@ -143,7 +144,7 @@ gexp:
   | i=INT      { loc $startpos $endpos @@ CInt i }
   | TRUE      { loc $startpos $endpos @@ CBool true }
   | FALSE      { loc $startpos $endpos @@ CBool false }
-  | NEW t=ty LBRACKET RBRACKET LBRACE es=separated_list(COMMA, gexp) RBRACE { loc $startpos $endpos @@ CArr (t, es) }
+  | NEW t=ty CBRACKET LBRACE es=separated_list(COMMA, gexp) RBRACE { loc $startpos $endpos @@ CArr (t, es) }
   | s=STRING    { loc $startpos $endpos @@ CStr s }
 
 lhs:  
@@ -159,12 +160,7 @@ exp:
   | FALSE              { loc $startpos $endpos @@ CBool false}
   | s=STRING    { loc $startpos $endpos @@ CStr s }
 
-  | NEW TINT LBRACKET RBRACKET LBRACE es=separated_list(COMMA, exp) RBRACE { loc $startpos $endpos @@ CArr (TInt, es) }
-  | NEW TBOOL LBRACKET RBRACKET LBRACE es=separated_list(COMMA, exp) RBRACE { loc $startpos $endpos @@ CArr (TBool, es) }
-  | NEW TSTRING LBRACKET RBRACKET LBRACE es=separated_list(COMMA, exp) RBRACE { loc $startpos $endpos @@ CArr (TRef RString, es) }
-  | NEW TINT LBRACKET RBRACKET LBRACKET RBRACKET LBRACE es=separated_list(COMMA, exp) RBRACE { loc $startpos $endpos @@ CArr (TRef (RArray  TInt), es) }
-  | NEW TBOOL LBRACKET RBRACKET LBRACKET RBRACKET LBRACE es=separated_list(COMMA, exp) RBRACE { loc $startpos $endpos @@ CArr (TRef (RArray  TBool), es) }
-  | NEW TSTRING LBRACKET RBRACKET LBRACKET RBRACKET LBRACE es=separated_list(COMMA, exp) RBRACE { loc $startpos $endpos @@ CArr (TRef (RArray  (TRef RString)), es) }
+  | NEW t=ty CBRACKET LBRACE es=separated_list(COMMA, exp) RBRACE { loc $startpos $endpos @@ CArr (t, es) }
 
   | NEW TINT LBRACKET e=exp RBRACKET { loc $startpos $endpos @@ NewArr (TInt, e)}
   | NEW TBOOL LBRACKET e=exp RBRACKET { loc $startpos $endpos @@ NewArr (TBool, e)}
