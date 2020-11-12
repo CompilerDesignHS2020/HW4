@@ -359,18 +359,27 @@ let cmp_function_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
       | _ -> c
     ) c p 
 
+let ast_type_of_ast_exp (e:Ast.exp) :Ast.type =
+  match e with
+  | CNull rty -> rty
+  | CBool -> TBool
+  | CInt -> TInt
+  | CStr -> TRef of RString
+  | CArr(t, el) -> TRef of t
+  | _ -> TInt
+    
 (* Populate a context with bindings for global variables 
-   mapping OAT identifiers to LLVMlite gids and their types.
+mapping OAT identifiers to LLVMlite gids and their types.
 
-   Only a small subset of OAT expressions can be used as global initializers
-   in well-formed programs. (The constructors starting with C). 
+Only a small subset of OAT expressions can be used as global initializers
+in well-formed programs. (The constructors starting with C). 
 *)
 let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
   let rec rec_gctxt (rem_prog:Ast.prog) :Ctxt.t =
     begin match rem_prog with
       | h::tl -> 
         let new_decl = begin match h with
-          | Gvdecl n -> []
+          | Gvdecl n -> (n.elt.name, (cmp_ty n.elt.init.elt))
           | Gfdecl n -> []
         end
       in new_decl@(rec_gctxt tl)
@@ -378,10 +387,7 @@ let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
     end
   in
 
-  (**
-  (rec_gctxt c)@c 
-   *)
-
+  (rec_gctxt p)@c 
 
 
 
