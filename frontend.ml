@@ -404,7 +404,23 @@ let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
  *)
 
 let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) list =
-  failwith "cmp_fdecl not implemented"
+  let rec arg_loop rem_args = 
+    begin match rem_args with
+      | h::tl -> 
+        [Alloca I64]@[]@(arg_loop tl)
+      | [] -> []
+  in
+
+  let rec arg_loop rem_args = 
+    begin match rem_args with
+      | h::tl -> 
+        [Alloca I64]@[]@(arg_loop tl)
+      | [] -> []
+  in
+
+  let arg_insns = arg_loop f.elt.args in
+
+
 
 (* Compile a global initializer, returning the resulting LLVMlite global
    declaration, and a list of additional global declarations.
