@@ -470,15 +470,12 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
       | [] -> []
     end 
   in
-  let body_stream = cmp_stmts ctxt_with_args f.elt.body
 
-  let main_terminator = cmp_stmt c Ll.Ret in
+  let body_stream = cmp_stmts ctxt_with_args f.elt.body in
 
-  let main_block = { insns = arg_insns; term = main_terminator } in
+  let (body,globals) = cfg_of_stream (args_stream@body_stream) in
 
-  let body = cfg_of_stream arg_insns in
-
-  ({f_ty = arg_types; f_param = arg_uids; f_cfg = (main_block ,[])},[])
+  ({f_ty = arg_types; f_param = arg_uids; f_cfg = body},globals)
 
 (* Compile a global initializer, returning the resulting LLVMlite global
    declaration, and a list of additional global declarations.
