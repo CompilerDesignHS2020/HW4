@@ -418,8 +418,27 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
      be an array of pointers to arrays emitted as additional global declarations.
 *)
 
-let rec cmp_gexp c (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) list =
-  failwith "cmp_gexp not implemented"
+let rec cmp_gexp (c:Ctxt.t) (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) list =
+
+  let main_ty =
+    cmp_ty (ast_type_of_ast_exp e.elt)
+  in
+
+  let main_ginit = 
+    match e.elt with
+    | CNull(n) -> GNull
+    | CBool(b) -> if b then GInt(1L) else GInt(0L)
+    | CInt(i) -> GInt(i)
+    | CStr(s) -> GString(s)
+    | CArr(t,es) ->  GNull
+    | _ ->  GNull (* TODO: Throw error *)
+  in  
+
+  let main_gdecl =
+    (main_ty, main_ginit)
+  in
+
+  (main_gdecl,[])
 
 (* Oat internals function context ------------------------------------------- *)
 let internals = [
