@@ -434,13 +434,28 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
 
   let arg_uids = create_arg_uids f.elt.args in
 
+  let rec add_args_to_ctxt c rem_args = 
+    match rem_args with
+    | [] -> c
+    | h::tl -> 
+      let (arg_type, arg_name) = h in
+      let ptr = gensym f.elt.fname in
+      Ctxt.add c arg_name (cmp_ty arg_type, Ll.Id(ptr))
+  in
+
+  let ctxt_with_args = add_args_to_ctxt c f.elt.args in
+
   let rec arg_loop (rem_args) = 
     begin match rem_args with
       | h::tl -> 
         let (arg_type, arg_name) = h in
-        let ptr = gensym f.elt.fname in
-        [E(ptr, Alloca I64)]@ (* Allocate space for arg *)
-        [E(gensym f.elt.fname, Store(cmp_ty arg_type, Ll.Id(arg_name), Ll.Id(ptr)))]@ (* store arg to newly allocated stack space*)
+        let (ll_type,ptr) = Ctxt.lookup arg_name ctxt_with_args in
+        let ptr_uid = match ptr with 
+          | Id(uid) -> uid
+          | _ -> "hello there"
+        in
+        [E(ptr_uid, Alloca I64)]@ (* Allocate space for arg *)
+        [E(gensym f.elt.fname, Store(cmp_ty arg_type, Ll.Id(arg_name), Ll.Id(ptr_uid)))]@ (* store arg to newly allocated stack space*)
         (arg_loop tl)
       | [] -> []
     end
@@ -450,12 +465,12 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
   
   let rec cmp_stmts act_ctxt rem_stmts =
     begin match rem_stmts with
-      | h::tl -> let (new_ctxt, new_stream) = cmp_stmt act_ctxt Void h in
-        new_stream@cmp_stmts new_ctxt tl
-      | [] -> (act_ctxt, [])
+      | h::tl -> let (new_ctxt, new_stream) = (cmp_stmt act_ctxt Void h) in (*TODO: rt_ty *)
+        new_stream@(cmp_stmts new_ctxt tl)
+      | [] -> []
     end 
   in
-  let (ctxt, body_stream) = cmp_stmts ctxt_with_args f.elt.body
+  let body_stream = cmp_stmts ctxt_with_args f.elt.body
 
   let main_terminator = cmp_stmt c Ll.Ret in
 
