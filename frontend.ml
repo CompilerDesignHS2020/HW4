@@ -405,6 +405,17 @@ let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
 
 let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) list =
   
+  let rec create_arg_types rem_args = 
+    begin match rem_args with
+      | h::tl -> 
+        let (arg_type, arg_name) = h in
+        [(cmp_ty arg_type)]@(create_arg_types tl)
+      | [] -> []
+    end
+  in
+
+  let arg_types = ((create_arg_types f.elt.args), (cmp_ret_ty f.elt.frtyp)) in
+
   let rec create_arg_uids rem_args = 
     begin match rem_args with
       | h::tl -> 
@@ -414,8 +425,7 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
     end
   in
 
-  let arg_uids = create_arg_uids f.elt.args
-  in
+  let arg_uids = create_arg_uids f.elt.args in
 
   let rec arg_loop (rem_arg_uids: Ll.uid list): (uid * insn) list= 
     begin match rem_arg_uids with
@@ -429,7 +439,6 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
   in
 
   let arg_insns = arg_loop arg_uids in
-
 
 
 (* Compile a global initializer, returning the resulting LLVMlite global
