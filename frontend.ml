@@ -335,7 +335,14 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
  *)
 
 let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
-  failwith "cmp_stmt not implemented"
+  begin match stmt.elt with
+    | Ret e -> begin match e with
+      | None -> (c, [T(Ll.Ret(rt, None))])
+      | Some e -> let (ty, uid, stream) = cmp_exp c e in
+        (c, stream@[T(Ll.Ret(ty, Some uid))])
+    end
+    | _ -> (c, [])
+  end 
 
 (* Compile a series of statements *)
 and cmp_block (c:Ctxt.t) (rt:Ll.ty) (stmts:Ast.block) : Ctxt.t * stream =
@@ -427,23 +434,34 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
 
   let arg_uids = create_arg_uids f.elt.args in
 
-  let rec arg_loop (rem_args): (uid * insn) list= 
+  let rec arg_loop (rem_args) = 
     begin match rem_args with
       | h::tl -> 
         let (arg_type, arg_name) = h in
         let ptr = gensym f.elt.fname in
-        [(ptr, Alloca I64)]@ (* Allocate space for arg *)
-        [(gensym f.elt.fname, Store(cmp_ty arg_type, Ll.Id(arg_name), Ll.Id(ptr)))]@ (* store arg to newly allocated stack space*)
+        [E(ptr, Alloca I64)]@ (* Allocate space for arg *)
+        [E(gensym f.elt.fname, Store(cmp_ty arg_type, Ll.Id(arg_name), Ll.Id(ptr)))]@ (* store arg to newly allocated stack space*)
         (arg_loop tl)
       | [] -> []
     end
   in
 
-  let arg_insns = arg_loop f.elt.args in
+  let args_stream = arg_loop f.elt.args in
+  
+  let rec cmp_stmts act_ctxt rem_stmts =
+    begin match rem_stmts with
+      | h::tl -> let (new_ctxt, new_stream) = cmp_stmt act_ctxt Void h in
+        new_stream@cmp_stmts new_ctxt tl
+      | [] -> (act_ctxt, [])
+    end 
+  in
+  let (ctxt, body_stream) = cmp_stmts ctxt_with_args f.elt.body
 
-  let main_terminator = ("re", Ll.Ret(Void, None)) in
+  let main_terminator = cmp_stmt c Ll.Ret in
 
   let main_block = { insns = arg_insns; term = main_terminator } in
+
+  let body = cfg_of_stream arg_insns in
 
   ({f_ty = arg_types; f_param = arg_uids; f_cfg = (main_block ,[])},[])
 
