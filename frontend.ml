@@ -404,21 +404,31 @@ let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
  *)
 
 let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) list =
-  let rec arg_loop rem_args = 
+  
+  let rec create_arg_uids rem_args = 
     begin match rem_args with
       | h::tl -> 
-        [Alloca I64]@[]@(arg_loop tl)
+        let (arg_type, arg_name) = h in
+        [Ll.Id(arg_name)]@(create_arg_uids tl)
       | [] -> []
+    end
   in
 
-  let rec arg_loop rem_args = 
-    begin match rem_args with
+  let arg_uids = create_arg_uids f.elt.args
+  in
+
+  let rec arg_loop (rem_arg_uids: Ll.uid list): (uid * insn) list= 
+    begin match rem_arg_uids with
       | h::tl -> 
-        [Alloca I64]@[]@(arg_loop tl)
+        let ptr = Ll.Id(gensym f.elt.fname) in
+        [(ptr, Alloca I64)]@ (* Allocate space for arg *)
+        [(gensym f.elt.fname, Store(I64, h, ptr))]@ (* store arg to newly allocated stack space*)
+        (arg_loop tl)
       | [] -> []
+    end
   in
 
-  let arg_insns = arg_loop f.elt.args in
+  let arg_insns = arg_loop arg_uids in
 
 
 
