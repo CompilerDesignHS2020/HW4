@@ -172,6 +172,7 @@ a_final_brackets:
 a_array_type:
   | a=a_brackets LBRACE { a }
 
+
 exp:
   | id=IDENT            { loc $startpos $endpos @@ Id id }
   | i=INT               { loc $startpos $endpos @@ CInt i }
