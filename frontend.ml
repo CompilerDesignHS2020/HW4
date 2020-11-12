@@ -405,31 +405,40 @@ let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
 
 let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) list =
   
-  let rec create_arg_uids rem_args = 
+  let rec create_arg_types rem_args = 
     begin match rem_args with
       | h::tl -> 
         let (arg_type, arg_name) = h in
-        [Ll.Id(arg_name)]@(create_arg_uids tl)
+        [(cmp_ty arg_type)]@(create_arg_types tl)
       | [] -> []
     end
   in
 
-  let arg_uids = create_arg_uids f.elt.args
+  let arg_types = ((create_arg_types f.elt.args), (cmp_ret_ty f.elt.frtyp)) in
+
+  let rec create_arg_uids rem_args = 
+    begin match rem_args with
+      | h::tl -> 
+        let (arg_type, arg_name) = h in
+        [(arg_name)]@(create_arg_uids tl)
+      | [] -> []
+    end
   in
+
+  let arg_uids = create_arg_uids f.elt.args in
 
   let rec arg_loop (rem_arg_uids: Ll.uid list): (uid * insn) list= 
     begin match rem_arg_uids with
       | h::tl -> 
-        let ptr = Ll.Id(gensym f.elt.fname) in
+        let ptr = gensym f.elt.fname in
         [(ptr, Alloca I64)]@ (* Allocate space for arg *)
-        [(gensym f.elt.fname, Store(I64, h, ptr))]@ (* store arg to newly allocated stack space*)
+        [(gensym f.elt.fname, Store(I64, Ll.Id(h), Ll.Id(ptr)))]@ (* store arg to newly allocated stack space*)
         (arg_loop tl)
       | [] -> []
     end
   in
 
   let arg_insns = arg_loop arg_uids in
-
 
 
 (* Compile a global initializer, returning the resulting LLVMlite global
