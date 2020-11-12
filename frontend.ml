@@ -464,13 +464,12 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
   let args_stream = arg_loop f.elt.args in
   
   let rec cmp_stmts act_ctxt rem_stmts =
-    begin match rem_stmts with
+    match rem_stmts with
       | h::tl -> let (new_ctxt, new_stream) = (cmp_stmt act_ctxt Void h) in (*TODO: rt_ty *)
         new_stream@(cmp_stmts new_ctxt tl)
-      | [] -> []
-    end 
+      | [] -> [] 
   in
-  let body_stream = cmp_stmts ctxt_with_args f.elt.body
+  let body_stream = cmp_stmts ctxt_with_args f.elt.body in
 
   let main_terminator = cmp_stmt c Ll.Ret in
 
