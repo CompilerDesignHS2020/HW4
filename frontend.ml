@@ -409,7 +409,7 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
     begin match rem_args with
       | h::tl -> 
         let (arg_type, arg_name) = h in
-        [Ll.Id(arg_name)]@(create_arg_uids tl)
+        [(arg_name)]@(create_arg_uids tl)
       | [] -> []
     end
   in
@@ -420,9 +420,9 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
   let rec arg_loop (rem_arg_uids: Ll.uid list): (uid * insn) list= 
     begin match rem_arg_uids with
       | h::tl -> 
-        let ptr = Ll.Id(gensym f.elt.fname) in
+        let ptr = gensym f.elt.fname in
         [(ptr, Alloca I64)]@ (* Allocate space for arg *)
-        [(gensym f.elt.fname, Store(I64, h, ptr))]@ (* store arg to newly allocated stack space*)
+        [(gensym f.elt.fname, Store(I64, Ll.Id(h), Ll.Id(ptr)))]@ (* store arg to newly allocated stack space*)
         (arg_loop tl)
       | [] -> []
     end
