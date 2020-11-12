@@ -150,7 +150,27 @@ lhs:
   | id=IDENT            { loc $startpos $endpos @@ Id id }
   | e=exp LBRACKET i=exp RBRACKET
                         { loc $startpos $endpos @@ Index (e, i) }
+a_base_type:
+  | TINT   { TInt }
+  | TBOOL   { TBool }
+  | TSTRING { TRef RString }
 
+
+a_brackets:
+  | a=a_non_final_brackets { a }
+  | a=a_final_brackets { a }
+
+/* M */
+a_non_final_brackets:
+  | t=a_brackets LBRACKET RBRACKET { TRef (RArray t) }
+
+/* U */
+a_final_brackets:
+  | b=a_base_type LBRACKET RBRACKET { b }
+
+/* E */
+a_array_type:
+  | a=a_brackets LBRACE { a }
 
 exp:
   | id=IDENT            { loc $startpos $endpos @@ Id id }
@@ -159,7 +179,7 @@ exp:
   | TRUE              { loc $startpos $endpos @@ CBool true}
   | FALSE              { loc $startpos $endpos @@ CBool false}
   | s=STRING    { loc $startpos $endpos @@ CStr s }
-  | NEW t=ty LBRACKET RBRACKET LBRACE es=separated_list(COMMA, exp) RBRACE { loc $startpos $endpos @@ CArr (t, es) } /* TODO: multiple [] pairs should be possible */
+  | NEW t=a_array_type  es=separated_list(COMMA, exp) RBRACE { loc $startpos $endpos @@ CArr (t, es) } /* TODO: multiple [] pairs should be possible */
   | NEW TINT LBRACKET e=exp RBRACKET { loc $startpos $endpos @@ NewArr (TInt, e)}
   | NEW TBOOL LBRACKET e=exp RBRACKET { loc $startpos $endpos @@ NewArr (TBool, e)}
   | e1=exp b=bop e2=exp { loc $startpos $endpos @@ Bop (b, e1, e2) }
