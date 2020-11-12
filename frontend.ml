@@ -359,13 +359,13 @@ let cmp_function_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
       | _ -> c
     ) c p 
 
-let ast_type_of_ast_exp (e:Ast.exp) :Ast.type =
+let ast_type_of_ast_exp (e:Ast.exp) : Ast.ty =
   match e with
-  | CNull rty -> rty
-  | CBool -> TBool
-  | CInt -> TInt
-  | CStr -> TRef of RString
-  | CArr(t, el) -> TRef of t
+  | CNull rty -> TRef rty
+  | CBool bool -> TBool
+  | CInt int -> TInt
+  | CStr string -> TRef RString
+  | CArr(t, el) -> TRef (RArray t)
   | _ -> TInt
     
 (* Populate a context with bindings for global variables 
