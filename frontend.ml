@@ -313,10 +313,9 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     let uid = gensym "sucuk" in
       (I1,Ll.Id(uid), [E(uid, Binop(Add, I1, Const(0L), Const(b)))] )
 
-  | CInt(i) -> 
-    let uid = gensym "sucuk" in 
+  | CInt(i) -> let uid = gensym "sucuk" in 
       (I64,Ll.Id(uid), [E(uid, Binop(Add, I64, Const(0L), Const(i)))] )
-      
+
   | CStr(s) -> let uid = gensym "sucuk" in 
               (I64,Ll.Id(uid), 
               [E(uid, Binop(Add, I64, Const(0L), Const(i)))] )
