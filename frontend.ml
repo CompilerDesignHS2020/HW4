@@ -458,7 +458,8 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
     | h::tl -> 
       let (arg_type, arg_name) = h in
       let ptr = gensym f.elt.fname in
-      Ctxt.add c arg_name (cmp_ty arg_type, Ll.Id(ptr))
+      let new_ctxt = Ctxt.add c arg_name (cmp_ty arg_type, Ll.Id(ptr)) in
+      add_args_to_ctxt new_ctxt tl
   in
   let ctxt_with_args = add_args_to_ctxt c f.elt.args in
     
@@ -470,29 +471,25 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
   let rec arg_loop rem_args = 
     
     begin match rem_args with
-    | [] -> print_endline @@ "done"; []
+    | [] -> []
     | h::tl -> 
       let (ast_ty, ast_id) = h in
       let (ll_ty,ptr_to_arg) = Ctxt.lookup ast_id ctxt_with_args in (* Pointer to arg variable *)
       let uid_of_arg = 
-      match ptr_to_arg with
-      | Ll.Id(uid) -> uid
-      | _ -> failwith "Arg operand was no uid"
+        match ptr_to_arg with
+        | Ll.Id(uid) -> uid
+        | _ -> failwith "Arg operand was no uid"
       in
       let stream_of_this_args = [
         I(uid_of_arg, Alloca(ll_ty));
         I(gensym f.elt.fname, Store(ll_ty, Ll.Id(ast_id), ptr_to_arg ))
-      ] in
-      print_endline @@ "before recursion";
-      let stream_of_other_args = arg_loop tl in
-      print_endline @@ "after recursion";
-      stream_of_this_args@stream_of_other_args
-    end
-  in
+        ] in
+        let stream_of_other_args = arg_loop tl in
+        stream_of_this_args@stream_of_other_args
+      end
+    in
   
-  print_endline @@ "gittero3";
   let args_stream = arg_loop f.elt.args in
-  print_endline @@ "gittero4";
 
   let (some_ctxt, body_stream) = cmp_block ctxt_with_args (cmp_ret_ty f.elt.frtyp) f.elt.body in
 
