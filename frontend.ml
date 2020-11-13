@@ -319,6 +319,41 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   | CStr(s) -> let gid = gensym "sucuk" in 
           (Ptr(I8),Ll.Gid(gid), 
           [G(gid, (Ptr(I8), GString(s)))])
+  
+  
+  | Bop((ast_bop, e1, e2)) -> 
+      (*convert ast binop to ast binop or ast binop 
+      sry this is very ugly. don't rememb how to match on two different types*)
+      let (ll_bop, ll_cnd, which) =
+      begin match ast_bop with
+        | Add -> (Ll.Add, Ll.Eq, 0)
+        | Sub -> (Ll.Sub, Ll.Eq, 0)
+        | Mul -> (Ll.Mul, Ll.Eq, 0)
+        | And -> (Ll.And, Ll.Eq, 0)
+        | Or -> (Ll.Or, Ll.Eq, 0)
+        | IAnd -> (Ll.And, Ll.Eq, 0)
+        | IOr -> (Ll.Or, Ll.Eq, 0)
+        | Shl -> (Ll.Shl, Ll.Eq, 0)
+        | Shr -> (Ll.Lshr, Ll.Eq, 0)
+        | Sar -> (Ll.Ashr, Ll.Eq, 0)
+        | Eq -> (Ll.Add, Ll.Eq, 1)
+        | Neq -> (Ll.Add, Ll.Ne, 1)
+        | Lt -> (Ll.Add, Ll.Slt, 1)
+        | Lte -> (Ll.Add, Ll.Sle, 1)
+        | Gt -> (Ll.Add, Ll.Sgt, 1)
+        | Gte -> (Ll.Add, Ll.Sge, 1)
+      end in 
+      let uid = gensym "sucuk" in 
+      let (ty, _, _) = typ_of_binop ast_bop in
+      let (ty1, o1, stream1) = cmp_exp c e1 in
+      let (ty2, o2, stream2) = cmp_exp c e2 in
+      (*TODO: which type should we take, the one from ast_bop, or from the rec cmp_exp call
+      or should we check if those types are equal? I think so...*)
+      if which = 0 then
+        (Ptr(I8) , Ll.Id(uid),[I(uid, Binop(ll_bop , cmp_ty ty, o1, o2))])
+      else
+        (Ptr(I8) , Ll.Id(uid),[I(uid, Icmp(ll_cnd , cmp_ty ty, o1, o2))]) 
+
   | _ -> failwith "ur an fagit"
 
 (* Compile a statement in context c with return typ rt. Return a new context, 
