@@ -306,13 +306,19 @@ let oat_alloc_array (t:Ast.ty) (size:Ll.operand) : Ll.ty * operand * stream =
 
 let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   match exp.elt with
-  | CNull(r) -> let uid = gensym "sucuk" in (I64,Ll.Id(uid), [E(uid, Binop(Add, Ptr(cmp_rty r), Const(0L), Const(0L)))] )
-  | CBool(bo) -> let b = if bo then 1L else 0L in let uid = gensym "sucuk" in(I1,Ll.Id(uid), [E(uid, Binop(Add, I1, Const(0L), Const(b)))] )
-  | CInt(i) -> let uid = gensym "sucuk" in (I64,Ll.Id(uid), [E(uid, Binop(Add, I64, Const(0L), Const(i)))] )
-  | CStr(s) -> 
-                let gid = gensym "sucuk" in 
-              (Ptr(I8),Ll.Gid(gid), 
-              [G(gid, (Ptr(I8), GString(s)))])
+  | CNull(r) -> let uid = gensym "sucuk" in 
+    (I64,Ll.Id(uid), [E(uid, Binop(Add, Ptr(cmp_rty r), Const(0L), Const(0L)))] )
+
+  | CBool(bo) -> let b = if bo then 1L else 0L in 
+    let uid = gensym "sucuk" in
+      (I1,Ll.Id(uid), [E(uid, Binop(Add, I1, Const(0L), Const(b)))] )
+
+  | CInt(i) -> let uid = gensym "sucuk" in 
+      (I64,Ll.Id(uid), [E(uid, Binop(Add, I64, Const(0L), Const(i)))] )
+
+  | CStr(s) -> let gid = gensym "sucuk" in 
+          (Ptr(I8),Ll.Gid(gid), 
+          [G(gid, (Ptr(I8), GString(s)))])
   | _ -> failwith "ur an fagit"
 
 (* Compile a statement in context c with return typ rt. Return a new context, 
@@ -487,15 +493,8 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
   print_endline @@ "gittero3";
   let args_stream = arg_loop f.elt.args in
   print_endline @@ "gittero4";
-  
-  let rec cmp_stmts act_ctxt rem_stmts =
-    match rem_stmts with
-      | h::tl -> let (new_ctxt, new_stream) = (cmp_stmt act_ctxt Void h) in (*TODO: rt_ty *)
-        new_stream@(cmp_stmts new_ctxt tl)
-      | [] -> [] 
-  in
 
-  let body_stream = cmp_stmts ctxt_with_args f.elt.body in
+  let (some_ctxt, body_stream) = cmp_block ctxt_with_args (cmp_ret_ty f.elt.frtyp) f.elt.body in
 
   let (body,globals) = cfg_of_stream (args_stream@body_stream) in
 
