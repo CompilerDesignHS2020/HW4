@@ -309,10 +309,10 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   | CNull(r) -> let uid = gensym "sucuk" in (I64,Ll.Id(uid), [E(uid, Binop(Add, Ptr(cmp_rty r), Const(0L), Const(0L)))] )
   | CBool(bo) -> let b = if bo then 1L else 0L in let uid = gensym "sucuk" in(I1,Ll.Id(uid), [E(uid, Binop(Add, I1, Const(0L), Const(b)))] )
   | CInt(i) -> let uid = gensym "sucuk" in (I64,Ll.Id(uid), [E(uid, Binop(Add, I64, Const(0L), Const(i)))] )
-  | CStr(s) -> let uid = gensym "sucuk" in 
-              (I64,Ll.Id(uid), 
-              [E(uid, Binop(Add, I64, Const(0L), Const(i)))] )
-  | _ -> ()
+  | CStr(s) -> 
+                let gid = gensym "sucuk" in 
+              (Ptr(I8),Ll.Gid(gid), 
+              [G(gid, (Ptr(I8), GString(s)))])
   | _ -> failwith "ur an fagit"
 
 (* Compile a statement in context c with return typ rt. Return a new context, 
@@ -420,28 +420,32 @@ let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
 
 let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) list =
   
+  (* creates a list of Ll.ty form Ast.ty arguments *)
   let rec create_arg_types rem_args = 
     begin match rem_args with
-      | h::tl -> 
-        let (arg_type, arg_name) = h in
-        [(cmp_ty arg_type)]@(create_arg_types tl)
+    | h::tl -> 
+      let (arg_type, arg_name) = h in
+      [(cmp_ty arg_type)]@(create_arg_types tl)
       | [] -> []
     end
   in
-
+  
   let arg_types = ((create_arg_types f.elt.args), (cmp_ret_ty f.elt.frtyp)) in
-
+  
+  (* fill Oat arg variable names into a list to use them as uids later *)
   let rec create_arg_uids rem_args = 
     begin match rem_args with
-      | h::tl -> 
-        let (arg_type, arg_name) = h in
-        [(arg_name)]@(create_arg_uids tl)
+    | h::tl -> 
+      let (arg_type, arg_name) = h in
+      [(arg_name)]@(create_arg_uids tl)
       | [] -> []
     end
   in
-
+  
   let arg_uids = create_arg_uids f.elt.args in
-
+  
+  
+  (* fills the context with newly generated uid and arg variable name tuple e.g. (%arg_1, a) *)
   let rec add_args_to_ctxt c rem_args = 
     match rem_args with
     | [] -> c
@@ -450,26 +454,39 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
       let ptr = gensym f.elt.fname in
       Ctxt.add c arg_name (cmp_ty arg_type, Ll.Id(ptr))
   in
-
   let ctxt_with_args = add_args_to_ctxt c f.elt.args in
+    
 
-  let rec arg_loop (rem_args) = 
+  
+  (* generates a stream, that returns the instructions to copy the args to the stack.
+  The pointers to the args have already been assigned in the context *)
+  
+  let rec arg_loop rem_args = 
+    
     begin match rem_args with
-      | h::tl -> 
-        let (arg_type, arg_name) = h in
-        let (ll_type,ptr) = Ctxt.lookup arg_name ctxt_with_args in
-        let ptr_uid = match ptr with 
-          | Id(uid) -> uid
-          | _ -> "hello there"
-        in
-        [E(ptr_uid, Alloca I64)]@ (* Allocate space for arg *)
-        [E(gensym f.elt.fname, Store(cmp_ty arg_type, Ll.Id(arg_name), Ll.Id(ptr_uid)))]@ (* store arg to newly allocated stack space*)
-        (arg_loop tl)
-      | [] -> []
+    | [] -> print_endline @@ "done"; []
+    | h::tl -> 
+      let (ast_ty, ast_id) = h in
+      let (ll_ty,ptr_to_arg) = Ctxt.lookup ast_id ctxt_with_args in (* Pointer to arg variable *)
+      let uid_of_arg = 
+      match ptr_to_arg with
+      | Ll.Id(uid) -> uid
+      | _ -> failwith "Arg operand was no uid"
+      in
+      let stream_of_this_args = [
+        I(uid_of_arg, Alloca(ll_ty));
+        I(gensym f.elt.fname, Store(ll_ty, Ll.Id(ast_id), ptr_to_arg ))
+      ] in
+      print_endline @@ "before recursion";
+      let stream_of_other_args = arg_loop tl in
+      print_endline @@ "after recursion";
+      stream_of_this_args@stream_of_other_args
     end
   in
-
+  
+  print_endline @@ "gittero3";
   let args_stream = arg_loop f.elt.args in
+  print_endline @@ "gittero4";
   
   let rec cmp_stmts act_ctxt rem_stmts =
     match rem_stmts with

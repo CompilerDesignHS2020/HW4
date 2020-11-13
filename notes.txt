@@ -1,0 +1,47 @@
+
+
+
+	Ll.fdecl:
+	
+		+ f_ty (ty list * ty)
+		+ uid list (arg list)
+		- cfg (block, (lbl, block) list)
+		
+	
+	block:
+		insns: (uid * ins) list
+		terminator: (uid * terminator)
+		
+		
+	int foo (bool a, int b)
+	{
+	
+	}		
+		
+
+	define i64 @foo (i1 %a, i64 %b)
+	%1 = alloca i64
+	%2 = store i1 %a, i64* %1
+	
+	
+	
+	Return (x+1);
+	
+	
+	stmt: Ret( (x+1) )
+	
+	
+	uid, stream, type = cmp_exp (x+1)
+	
+	stream:
+	%3 = Load x
+	%4 = Add %3, 1
+	
+	uid:
+	%4
+	
+	type:
+	int64
+	
+	Ret(int64, %4)
+	
