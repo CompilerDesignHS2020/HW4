@@ -306,20 +306,33 @@ let oat_alloc_array (t:Ast.ty) (size:Ll.operand) : Ll.ty * operand * stream =
 
 let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   match exp.elt with
-  | CNull(r) -> let uid = gensym "sucuk" in 
+  | CNull(r) -> 
+    let uid = gensym "sucuk" in 
     (I64,Ll.Id(uid), [E(uid, Binop(Add, Ptr(cmp_rty r), Const(0L), Const(0L)))] )
 
-  | CBool(bo) -> let b = if bo then 1L else 0L in 
+  | CBool(bo) -> 
+    let b = if bo then 1L else 0L in 
     let uid = gensym "sucuk" in
       (I1,Ll.Id(uid), [E(uid, Binop(Add, I1, Const(0L), Const(b)))] )
 
-  | CInt(i) -> let uid = gensym "sucuk" in 
-      (I64,Ll.Id(uid), [E(uid, Binop(Add, I64, Const(0L), Const(i)))] )
+  | CInt(i) -> 
+    let uid = gensym "sucuk" in 
+    (I64,Ll.Id(uid), [E(uid, Binop(Add, I64, Const(0L), Const(i)))] )
 
-  | CStr(s) -> let gid = gensym "sucuk" in 
-          (Ptr(I8),Ll.Gid(gid), 
-          [G(gid, (Ptr(I8), GString(s)))])
-  
+  | CStr(s) -> 
+    let gid = gensym "sucuk" in            
+    let uid = gensym "sucuk" in 
+    (Ptr(I8),Ll.Id(uid), 
+    [
+      G(gid, (Ptr(Array(String.length s +1 ,I8)), GString(s)));
+      I(uid, Gep(Ptr(Array(String.length s +1 ,I8)), Ll.Gid(gid), [Const(0L); Const(0L)]))
+    ])
+    | Id(i) ->
+    let (ll_ty, ll_operand) = Ctxt.lookup i c in
+    let uid = gensym "sucuk" in 
+    (ll_ty, Ll.Id(uid),[
+      I(uid, Load(ll_ty, ll_operand))
+    ])
   
   | Bop((ast_bop, e1, e2)) -> 
       (*convert ast binop to ast binop or ast binop 
