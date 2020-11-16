@@ -466,6 +466,19 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       | _ -> failwith "cnd operand is not Boolean"
     end
 
+    | Assn (e1, e2) -> 
+    let store_uid = 
+    begin match e1.elt with
+      | Id(id) -> id 
+      | Index(i1, i2) -> failwith "not implemtend"
+      | _ -> failwith "cannot assign to right hand op"
+    end in
+    let (assn_ty, exp_uid, exp_stream) = cmp_exp c e2 in
+    let (ty, op) = Ctxt.lookup store_uid c in
+    (c, exp_stream@
+      [I (gensym "sucuk", Store(assn_ty, op, Ll.Id store_uid))])
+
+
     | While (e, body_bl) -> 
       let (cnd_op_ty, cnd_op_uid, cnd_stream) = cmp_exp c e in
       begin match cnd_op_ty with
