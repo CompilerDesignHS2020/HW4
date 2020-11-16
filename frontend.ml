@@ -333,39 +333,51 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     (ll_ty, Ll.Id(uid),[
       I(uid, Load(ll_ty, ll_operand))
     ])
-  
+
   | Bop((ast_bop, e1, e2)) -> 
-      (*convert ast binop to ast binop or ast binop 
-      sry this is very ugly. don't rememb how to match on two different types*)
-      let (ll_bop, ll_cnd, which) =
-      begin match ast_bop with
-        | Add -> (Ll.Add, Ll.Eq, 0)
-        | Sub -> (Ll.Sub, Ll.Eq, 0)
-        | Mul -> (Ll.Mul, Ll.Eq, 0)
-        | And -> (Ll.And, Ll.Eq, 0)
-        | Or -> (Ll.Or, Ll.Eq, 0)
-        | IAnd -> (Ll.And, Ll.Eq, 0)
-        | IOr -> (Ll.Or, Ll.Eq, 0)
-        | Shl -> (Ll.Shl, Ll.Eq, 0)
-        | Shr -> (Ll.Lshr, Ll.Eq, 0)
-        | Sar -> (Ll.Ashr, Ll.Eq, 0)
-        | Eq -> (Ll.Add, Ll.Eq, 1)
-        | Neq -> (Ll.Add, Ll.Ne, 1)
-        | Lt -> (Ll.Add, Ll.Slt, 1)
-        | Lte -> (Ll.Add, Ll.Sle, 1)
-        | Gt -> (Ll.Add, Ll.Sgt, 1)
-        | Gte -> (Ll.Add, Ll.Sge, 1)
-      end in 
+      (*convert ast binop to ast binop or ast binop*)
+      
+      let (ll_ty1, ll_o1, ll_stream1) = cmp_exp c e1 in
+      let (ll_ty2, ll_o2, ll_stream2) = cmp_exp c e2 in
       let uid = gensym "sucuk" in 
-      let (ty, _, _) = typ_of_binop ast_bop in
-      let (ty1, o1, stream1) = cmp_exp c e1 in
-      let (ty2, o2, stream2) = cmp_exp c e2 in
-      (*TODO: which type should we take, the one from ast_bop, or from the rec cmp_exp call
-      or should we check if those types are equal? I think so...*)
-      if which = 0 then
-        (Ptr(I8) , Ll.Id(uid),[I(uid, Binop(ll_bop , cmp_ty ty, o1, o2))])
-      else
-        (Ptr(I8) , Ll.Id(uid),[I(uid, Icmp(ll_cnd , cmp_ty ty, o1, o2))]) 
+      let ast_types = typ_of_binop ast_bop in
+      let (ll_ret_ty, _, _) = ast_types in
+      begin match ast_types with
+        | (TInt, TInt, TInt) -> let ll_bop = 
+          begin match ast_bop with
+            | Add -> (Ll.Add)
+            | Sub -> (Ll.Sub)
+            | Mul -> (Ll.Mul)
+            | IAnd -> (Ll.And)
+            | IOr -> (Ll.Or)
+            | Shl -> (Ll.Shl)
+            | Shr -> (Ll.Lshr)
+            | Sar -> (Ll.Ashr)
+            | _ -> failwith "wrong ll_ret_ty"
+          end in
+          (Ptr(I8) , Ll.Id(uid),[I(uid, Binop(ll_bop , cmp_ty ll_ret_ty, ll_o1, ll_o2))])
+
+        | (TBool, TBool, TBool) -> let ll_bop = 
+          begin match ast_bop with
+            | And -> (Ll.And)
+            | Or -> (Ll.Or)
+            | _ -> failwith "wrong ll_ret_ty"
+          end in
+          (Ptr(I8) , Ll.Id(uid),[I(uid, Binop(ll_bop , cmp_ty ll_ret_ty, ll_o1, ll_o2))])
+
+        | (TBool, TInt, TInt) -> let ll_cnd = 
+          begin match ast_bop with
+            | Eq -> (Ll.Eq)
+            | Neq -> (Ll.Ne)
+            | Lt -> (Ll.Slt)
+            | Lte -> (Ll.Sle)
+            | Gt -> (Ll.Sgt)
+            | Gte -> (Ll.Sge)
+            | _ -> failwith "wrong ll_ret_ty"
+          end in
+        (Ptr(I8) , Ll.Id(uid),[I(uid, Icmp(ll_cnd , cmp_ty ll_ret_ty, ll_o1, ll_o2))])   
+        | _ -> failwith "default ast_Types match case"
+        end
 
   | _ -> failwith "ur an fagit"
 
