@@ -432,7 +432,7 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       let (cnd_op_ty, cnd_op_uid, cnd_stream) = cmp_exp c e in
       begin match cnd_op_ty with
       | I1 -> 
-        (*everything from then and else blocks is added to ctxt*)
+        (*then and else blocks are added to ctxt*)
         let (_, then_stream) = cmp_block c rt (if_block) in
         let (_, else_stream) = cmp_block c rt (if_block) in 
 
@@ -460,7 +460,6 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       let (cnd_op_ty, cnd_op_uid, cnd_stream) = cmp_exp c e in
       begin match cnd_op_ty with
       | I1 -> 
-        (*everything from then and else blocks is added to ctxt*)
         let (_, body_stream) = cmp_block c rt (body_bl) in
 
         let option_id = Ll.Id (gensym "sucuk") in
@@ -468,6 +467,7 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
         let body_lbl = gensym "else" in 
         let post_lbl = gensym "post" in 
 
+        (*concatenating insns together*)
         (c, [T (Ll.Br(pre_lbl))]@
           [L(pre_lbl)]@
           cnd_stream@[I (gensym "sucuk", Icmp(Eq, cnd_op_ty, cnd_op_uid, Ll.Const(1L)))]@
@@ -478,6 +478,54 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
           [T (Ll.Br(pre_lbl))]@
           (*post*)
           [L(post_lbl)])
+      | _ -> failwith "cnd operand is not Boolean"
+    end
+
+    | For (vdecl_list, cnd_exp, inc, body_bl) ->
+      (*compile decl list*)
+      let rec cmp_vdecls rem_vdecl = 
+        let (old_ctxt, rem_vdecl_list) = rem_vdecl in
+        begin match rem_vdecl_list with
+          | h::tl -> 
+            let (act_ctxt, this_decl_stream) = cmp_stmt old_ctxt rt (no_loc (Decl(h))) in
+            let (new_ctxt, rem_stream) = cmp_vdecls (act_ctxt, tl) in
+            (new_ctxt, this_decl_stream@rem_stream)
+          | [] -> (old_ctxt, [])
+        end
+      in
+      let (ctxt, vdecls_stream) = cmp_vdecls (c, vdecl_list) in
+
+      (*compile cnd expression, set true if no expression given*)
+      let (cnd_op_ty, cnd_op_uid, cnd_stream) = 
+      begin match cnd_exp with
+        | Some(e) -> cmp_exp ctxt e
+        | None -> let rand_id = gensym "sucuk" in
+          (I1, Ll.Id(rand_id),  [I(rand_id, Binop(Add, I1, Const(1L), Const(0L)))])
+      end in
+
+      begin match cnd_op_ty with
+      | I1 -> 
+        (*body block is added to ctxt*)
+        let (_, body_stream) = cmp_block ctxt rt (body_bl) in
+
+        let option_id = Ll.Id (gensym "sucuk") in
+        let pre_lbl = gensym "pre" in 
+        let body_lbl = gensym "else" in 
+        let post_lbl = gensym "post" in 
+
+        (*concatenating insns together*)
+        (ctxt, vdecls_stream@
+          [T (Ll.Br(pre_lbl))]@
+          [L(pre_lbl)]@
+          cnd_stream@[I (gensym "sucuk", Icmp(Eq, cnd_op_ty, cnd_op_uid, Ll.Const(1L)))]@
+          [T (Ll.Cbr(option_id, body_lbl, post_lbl))]@
+          (*body block*)
+          [L(body_lbl)]@
+          body_stream@
+          [T (Ll.Br(pre_lbl))]@
+          (*post*)
+          [L(post_lbl)])
+    
       | _ -> failwith "cnd operand is not Boolean"
     end
 
