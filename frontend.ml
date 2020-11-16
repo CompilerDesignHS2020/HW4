@@ -337,9 +337,14 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   | Bop((ast_bop, e1, e2)) -> 
       (*convert ast binop to ast binop or ast binop*)
       
+      (*rec call, compile both operands first*)
       let (ll_ty1, ll_o1, ll_stream1) = cmp_exp c e1 in
       let (ll_ty2, ll_o2, ll_stream2) = cmp_exp c e2 in
       let uid = gensym "sucuk" in 
+
+      (*compiling ast binop gives us either an ll binop or an ll icmp instruction
+      we need to match on the operand & opcode types to decide
+      *)
       let ast_types = typ_of_binop ast_bop in
       let (ll_ret_ty, _, _) = ast_types in
       begin match ast_types with
@@ -353,7 +358,7 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
             | Shl -> (Ll.Shl)
             | Shr -> (Ll.Lshr)
             | Sar -> (Ll.Ashr)
-            | _ -> failwith "wrong ll_ret_ty"
+            | _ -> failwith "ll_ret_ty doesn't match ll opcode"
           end in
           (Ptr(I8) , Ll.Id(uid),[I(uid, Binop(ll_bop , cmp_ty ll_ret_ty, ll_o1, ll_o2))])
 
@@ -361,7 +366,7 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
           begin match ast_bop with
             | And -> (Ll.And)
             | Or -> (Ll.Or)
-            | _ -> failwith "wrong ll_ret_ty"
+            | _ -> failwith "ll_ret_ty doesn't match ll opcode"
           end in
           (Ptr(I8) , Ll.Id(uid),[I(uid, Binop(ll_bop , cmp_ty ll_ret_ty, ll_o1, ll_o2))])
 
@@ -373,10 +378,10 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
             | Lte -> (Ll.Sle)
             | Gt -> (Ll.Sgt)
             | Gte -> (Ll.Sge)
-            | _ -> failwith "wrong ll_ret_ty"
+            | _ -> failwith "ll_ret_ty doesn't match ll opcode"
           end in
-        (Ptr(I8) , Ll.Id(uid),[I(uid, Icmp(ll_cnd , cmp_ty ll_ret_ty, ll_o1, ll_o2))])   
-        | _ -> failwith "default ast_Types match case"
+          (Ptr(I8) , Ll.Id(uid),[I(uid, Icmp(ll_cnd , cmp_ty ll_ret_ty, ll_o1, ll_o2))])   
+        | _ -> failwith "there are unmatched ast_types cases"
         end
 
   | _ -> failwith "ur an fagit"
