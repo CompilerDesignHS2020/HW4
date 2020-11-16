@@ -420,12 +420,41 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       | Some e -> let (ty, uid, stream) = cmp_exp c e in
         (c, stream@[T(Ll.Ret(ty, Some uid))])
     end
-    | Decl (id, e) -> let (ty, result_uid, stream) = cmp_exp c e in
+
+    | Decl (id, e) -> let (decl_ty, result_uid, stream) = cmp_exp c e in
       let store_id = gensym "sucuk" in
       let ll_id = Ll.Id store_id in
-      (Ctxt.add c id (ty, ll_id), [E (store_id, Alloca(ty))]@
+      (Ctxt.add c id (decl_ty, ll_id), [E (store_id, Alloca(decl_ty))]@
         stream@
-        [E (gensym "sucuk", Store(ty, result_uid, ll_id))])
+        [E (gensym "sucuk", Store(decl_ty, result_uid, ll_id))])
+
+    | If (e, if_block, else_block) -> 
+      let (cnd_op_ty, cnd_op_uid, cnd_stream) = cmp_exp c e in
+      begin match cnd_op_ty with
+      | I1 -> 
+        (*everything from then and else blocks is added to ctxt*)
+        let (if_ctxt, if_stream) = cmp_block c rt (if_block) in
+        let (else_ctxt, else_stream) = cmp_block if_ctxt rt (if_block) in 
+
+        let option_id = Ll.Id (gensym "sucuk") in
+        let then_lbl = gensym "then" in 
+        let else_lbl = gensym "else" in 
+        let merge_lbl = gensym "merge" in 
+
+        (else_ctxt, cnd_stream@[I (gensym "sucuk", Icmp(Eq, cnd_op_ty, cnd_op_uid, Ll.Const(1L)))]@
+          [T (Ll.Cbr(option_id, then_lbl, else_lbl))]@
+          (*then block*)
+          [L(then_lbl)]@
+          if_stream@
+          [T (Ll.Br(else_lbl))]@
+          (*else block*)
+          [L(else_lbl)]@
+          else_stream@
+          (*merge*)
+          [T (Ll.Br(merge_lbl))]@
+          [L(merge_lbl)])
+      | _ -> failwith "cnd operand is not Boolean"
+    end
     | _ -> (c, [])
   end 
 
