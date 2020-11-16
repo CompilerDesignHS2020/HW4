@@ -324,16 +324,14 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     let uid = gensym "sucuk" in 
     (Ptr(I8),Ll.Gid(gid), 
     [
-      I("joelll", Alloca(I64));
-      G(gid, (Array(String.length s +1, I8), GString(s)))
-      (*I(uid, Gep(Ptr(Array(String.length s +1 ,I8)), Ll.Gid(gid), [Const(0L); Const(0L)]))
-      *)
+      G(gid, (Array(String.length s +1, I8), GString(s)));
+      I(uid, Gep(Ptr(I8), Ll.Gid(gid), [Const(0L); Const(0L)]))
     ])
   | Id(i) ->
     let (ll_ty, ll_operand) = Ctxt.lookup i c in
     let uid = gensym "sucuk" in 
     (ll_ty, Ll.Id(uid),[
-      I(uid, Load(ll_ty, ll_operand))
+      I(uid, Load(Ptr(ll_ty), ll_operand))
     ])
 
   | Bop((ast_bop, e1, e2)) -> 
@@ -362,7 +360,7 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
             | Sar -> (Ll.Ashr)
             | _ -> failwith "ll_ret_ty doesn't match ll opcode"
           end in
-          (I64 , Ll.Id(uid),[I(uid, Binop(ll_bop , cmp_ty ll_ret_ty, ll_o1, ll_o2))])
+          (I64 , Ll.Id(uid), ll_stream1@ll_stream2@[I(uid, Binop(ll_bop , cmp_ty ll_ret_ty, ll_o1, ll_o2))])
 
         | (TBool, TBool, TBool) -> let ll_bop = 
           begin match ast_bop with
@@ -370,7 +368,7 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
             | Or -> (Ll.Or)
             | _ -> failwith "ll_ret_ty doesn't match ll opcode"
           end in
-          (I64 , Ll.Id(uid),[I(uid, Binop(ll_bop , cmp_ty ll_ret_ty, ll_o1, ll_o2))])
+          (I64 , Ll.Id(uid),ll_stream1@ll_stream2@[I(uid, Binop(ll_bop , cmp_ty ll_ret_ty, ll_o1, ll_o2))])
 
         | (TBool, TInt, TInt) -> let ll_cnd = 
           begin match ast_bop with
@@ -382,7 +380,7 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
             | Gte -> (Ll.Sge)
             | _ -> failwith "ll_ret_ty doesn't match ll opcode"
           end in
-          (I1 , Ll.Id(uid),[I(uid, Icmp(ll_cnd , cmp_ty ll_ret_ty, ll_o1, ll_o2))])   
+          (I1 , Ll.Id(uid),ll_stream1@ll_stream2@[I(uid, Icmp(ll_cnd , cmp_ty ll_ret_ty, ll_o1, ll_o2))])   
         | _ -> failwith "there are unmatched ast_types cases"
         end
 
@@ -420,14 +418,15 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
     | Ret e -> begin match e with
       | None -> (c, [T(Ll.Ret(rt, None))])
       | Some e -> let (ty, uid, stream) = cmp_exp c e in
-        (c, stream@[T(Ll.Ret(ty, Some uid))])
-    end
+        (c, stream@[T(Ll.Ret(rt, Some uid))])
+      end
     | Decl (id, e) -> let (ty, result_uid, stream) = cmp_exp c e in
       let store_id = gensym "sucuk" in
-      let ll_id = Ll.Id store_id in
-      (Ctxt.add c id (ty, ll_id), [E (store_id, Alloca(ty))]@
+      let new_context = Ctxt.add c id (ty, Ll.Id store_id) in
+      (new_context, 
+        [E (store_id, Alloca(ty))]@
         stream@
-        [E (gensym "sucuk", Store(ty, result_uid, ll_id))])
+        [I (gensym "sucuk", Store(ty, result_uid, Ll.Id store_id))])
     | _ -> (c, [])
   end 
 
