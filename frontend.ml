@@ -422,6 +422,12 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       | Some e -> let (ty, uid, stream) = cmp_exp c e in
         (c, stream@[T(Ll.Ret(ty, Some uid))])
     end
+    | Decl (id, e) -> let (ty, result_uid, stream) = cmp_exp c e in
+      let store_id = gensym "sucuk" in
+      let ll_id = Ll.Id store_id in
+      (Ctxt.add c id (ty, ll_id), [E (store_id, Alloca(ty))]@
+        stream@
+        [E (gensym "sucuk", Store(ty, result_uid, ll_id))])
     | _ -> (c, [])
   end 
 
