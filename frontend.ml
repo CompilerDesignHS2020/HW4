@@ -327,7 +327,7 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
       G(gid, (Ptr(Array(String.length s +1 ,I8)), GString(s)));
       I(uid, Gep(Ptr(Array(String.length s +1 ,I8)), Ll.Gid(gid), [Const(0L); Const(0L)]))
     ])
-    | Id(i) ->
+  | Id(i) ->
     let (ll_ty, ll_operand) = Ctxt.lookup i c in
     let uid = gensym "sucuk" in 
     (ll_ty, Ll.Id(uid),[
