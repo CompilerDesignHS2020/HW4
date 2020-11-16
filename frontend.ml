@@ -385,6 +385,14 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
         | _ -> failwith "there are unmatched ast_types cases"
         end
 
+  | Uop(uop, e) ->  
+    let (ll_ty, ll_o, ll_stream) = cmp_exp c e in
+    let uid = gensym "sucuk" in
+      begin match uop with
+      | Neg -> (I64, Ll.Id(uid), ll_stream@[I(uid, Binop(Ll.Sub, I1, Const(0L), ll_o))])
+      | Bitnot -> (I64, Ll.Id(uid), ll_stream@[I(uid, Binop(Ll.Xor, I1, Const(-1L), ll_o))])
+      | Lognot -> (I1, Ll.Id(uid), ll_stream@[I(uid, Binop(Ll.And, I1, Const(0L), ll_o))])
+      end
   | _ -> failwith "ur an fagit"
 
 (* Compile a statement in context c with return typ rt. Return a new context, 
