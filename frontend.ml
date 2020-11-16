@@ -308,24 +308,26 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   match exp.elt with
   | CNull(r) -> 
     let uid = gensym "sucuk" in 
-    (I64,Ll.Id(uid), [E(uid, Binop(Add, Ptr(cmp_rty r), Const(0L), Const(0L)))] )
+    (I64,Ll.Id(uid), [I(uid, Binop(Add, Ptr(cmp_rty r), Const(0L), Const(0L)))] )
 
   | CBool(bo) -> 
     let b = if bo then 1L else 0L in 
     let uid = gensym "sucuk" in
-      (I1,Ll.Id(uid), [E(uid, Binop(Add, I1, Const(0L), Const(b)))] )
+      (I1,Ll.Id(uid), [I(uid, Binop(Add, I1, Const(0L), Const(b)))] )
 
   | CInt(i) -> 
     let uid = gensym "sucuk" in 
-    (I64,Ll.Id(uid), [E(uid, Binop(Add, I64, Const(0L), Const(i)))] )
+    (I64,Ll.Id(uid), [I(uid, Binop(Add, I64, Const(0L), Const(i)))] )
 
   | CStr(s) -> 
     let gid = gensym "sucuk" in            
     let uid = gensym "sucuk" in 
-    (Ptr(I8),Ll.Id(uid), 
+    (Ptr(I8),Ll.Gid(gid), 
     [
-      G(gid, (Ptr(Array(String.length s +1 ,I8)), GString(s)));
-      I(uid, Gep(Ptr(Array(String.length s +1 ,I8)), Ll.Gid(gid), [Const(0L); Const(0L)]))
+      I("joelll", Alloca(I64));
+      G(gid, (Array(String.length s +1, I8), GString(s)))
+      (*I(uid, Gep(Ptr(Array(String.length s +1 ,I8)), Ll.Gid(gid), [Const(0L); Const(0L)]))
+      *)
     ])
   | Id(i) ->
     let (ll_ty, ll_operand) = Ctxt.lookup i c in
@@ -558,7 +560,7 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
 
   let (some_ctxt, body_stream) = cmp_block ctxt_with_args (cmp_ret_ty f.elt.frtyp) f.elt.body in
 
-  let (body,globals) = cfg_of_stream (args_stream@body_stream) in
+  let (body,globals) = cfg_of_stream (List.rev (args_stream@body_stream)) in
 
   ({f_ty = arg_types; f_param = arg_uids; f_cfg = body},globals)
 
