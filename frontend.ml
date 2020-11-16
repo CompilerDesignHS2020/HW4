@@ -333,6 +333,52 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     (ll_ty, Ll.Id(uid),[
       I(uid, Load(ll_ty, ll_operand))
     ])
+
+  | Bop((ast_bop, e1, e2)) -> 
+      (*convert ast binop to ast binop or ast binop*)
+      
+      let (ll_ty1, ll_o1, ll_stream1) = cmp_exp c e1 in
+      let (ll_ty2, ll_o2, ll_stream2) = cmp_exp c e2 in
+      let uid = gensym "sucuk" in 
+      let ast_types = typ_of_binop ast_bop in
+      let (ll_ret_ty, _, _) = ast_types in
+      begin match ast_types with
+        | (TInt, TInt, TInt) -> let ll_bop = 
+          begin match ast_bop with
+            | Add -> (Ll.Add)
+            | Sub -> (Ll.Sub)
+            | Mul -> (Ll.Mul)
+            | IAnd -> (Ll.And)
+            | IOr -> (Ll.Or)
+            | Shl -> (Ll.Shl)
+            | Shr -> (Ll.Lshr)
+            | Sar -> (Ll.Ashr)
+            | _ -> failwith "wrong ll_ret_ty"
+          end in
+          (Ptr(I8) , Ll.Id(uid),[I(uid, Binop(ll_bop , cmp_ty ll_ret_ty, ll_o1, ll_o2))])
+
+        | (TBool, TBool, TBool) -> let ll_bop = 
+          begin match ast_bop with
+            | And -> (Ll.And)
+            | Or -> (Ll.Or)
+            | _ -> failwith "wrong ll_ret_ty"
+          end in
+          (Ptr(I8) , Ll.Id(uid),[I(uid, Binop(ll_bop , cmp_ty ll_ret_ty, ll_o1, ll_o2))])
+
+        | (TBool, TInt, TInt) -> let ll_cnd = 
+          begin match ast_bop with
+            | Eq -> (Ll.Eq)
+            | Neq -> (Ll.Ne)
+            | Lt -> (Ll.Slt)
+            | Lte -> (Ll.Sle)
+            | Gt -> (Ll.Sgt)
+            | Gte -> (Ll.Sge)
+            | _ -> failwith "wrong ll_ret_ty"
+          end in
+        (Ptr(I8) , Ll.Id(uid),[I(uid, Icmp(ll_cnd , cmp_ty ll_ret_ty, ll_o1, ll_o2))])   
+        | _ -> failwith "default ast_Types match case"
+        end
+
   | _ -> failwith "ur an fagit"
 
 (* Compile a statement in context c with return typ rt. Return a new context, 
