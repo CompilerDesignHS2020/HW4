@@ -433,28 +433,54 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       begin match cnd_op_ty with
       | I1 -> 
         (*everything from then and else blocks is added to ctxt*)
-        let (if_ctxt, if_stream) = cmp_block c rt (if_block) in
-        let (else_ctxt, else_stream) = cmp_block if_ctxt rt (if_block) in 
+        let (_, then_stream) = cmp_block c rt (if_block) in
+        let (_, else_stream) = cmp_block c rt (if_block) in 
 
         let option_id = Ll.Id (gensym "sucuk") in
         let then_lbl = gensym "then" in 
         let else_lbl = gensym "else" in 
         let merge_lbl = gensym "merge" in 
 
-        (else_ctxt, cnd_stream@[I (gensym "sucuk", Icmp(Eq, cnd_op_ty, cnd_op_uid, Ll.Const(1L)))]@
+        (c, cnd_stream@[I (gensym "sucuk", Icmp(Eq, cnd_op_ty, cnd_op_uid, Ll.Const(1L)))]@
           [T (Ll.Cbr(option_id, then_lbl, else_lbl))]@
           (*then block*)
           [L(then_lbl)]@
-          if_stream@
-          [T (Ll.Br(else_lbl))]@
+          then_stream@
+          [T (Ll.Br(merge_lbl))]@
           (*else block*)
           [L(else_lbl)]@
           else_stream@
-          (*merge*)
           [T (Ll.Br(merge_lbl))]@
+          (*merge*)
           [L(merge_lbl)])
       | _ -> failwith "cnd operand is not Boolean"
     end
+
+    | While (e, body_bl) -> 
+      let (cnd_op_ty, cnd_op_uid, cnd_stream) = cmp_exp c e in
+      begin match cnd_op_ty with
+      | I1 -> 
+        (*everything from then and else blocks is added to ctxt*)
+        let (_, body_stream) = cmp_block c rt (body_bl) in
+
+        let option_id = Ll.Id (gensym "sucuk") in
+        let pre_lbl = gensym "pre" in 
+        let body_lbl = gensym "else" in 
+        let post_lbl = gensym "post" in 
+
+        (c, [T (Ll.Br(pre_lbl))]@
+          [L(pre_lbl)]@
+          cnd_stream@[I (gensym "sucuk", Icmp(Eq, cnd_op_ty, cnd_op_uid, Ll.Const(1L)))]@
+          [T (Ll.Cbr(option_id, body_lbl, post_lbl))]@
+          (*body block*)
+          [L(body_lbl)]@
+          body_stream@
+          [T (Ll.Br(pre_lbl))]@
+          (*post*)
+          [L(post_lbl)])
+      | _ -> failwith "cnd operand is not Boolean"
+    end
+
     | _ -> (c, [])
   end 
 
