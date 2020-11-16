@@ -360,7 +360,7 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
             | Sar -> (Ll.Ashr)
             | _ -> failwith "ll_ret_ty doesn't match ll opcode"
           end in
-          (Ptr(I8) , Ll.Id(uid),[I(uid, Binop(ll_bop , cmp_ty ll_ret_ty, ll_o1, ll_o2))])
+          (I64 , Ll.Id(uid),[I(uid, Binop(ll_bop , cmp_ty ll_ret_ty, ll_o1, ll_o2))])
 
         | (TBool, TBool, TBool) -> let ll_bop = 
           begin match ast_bop with
@@ -368,7 +368,7 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
             | Or -> (Ll.Or)
             | _ -> failwith "ll_ret_ty doesn't match ll opcode"
           end in
-          (Ptr(I8) , Ll.Id(uid),[I(uid, Binop(ll_bop , cmp_ty ll_ret_ty, ll_o1, ll_o2))])
+          (I64 , Ll.Id(uid),[I(uid, Binop(ll_bop , cmp_ty ll_ret_ty, ll_o1, ll_o2))])
 
         | (TBool, TInt, TInt) -> let ll_cnd = 
           begin match ast_bop with
@@ -380,7 +380,7 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
             | Gte -> (Ll.Sge)
             | _ -> failwith "ll_ret_ty doesn't match ll opcode"
           end in
-          (Ptr(I8) , Ll.Id(uid),[I(uid, Icmp(ll_cnd , cmp_ty ll_ret_ty, ll_o1, ll_o2))])   
+          (I1 , Ll.Id(uid),[I(uid, Icmp(ll_cnd , cmp_ty ll_ret_ty, ll_o1, ll_o2))])   
         | _ -> failwith "there are unmatched ast_types cases"
         end
 
