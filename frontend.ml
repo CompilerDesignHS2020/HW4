@@ -34,6 +34,7 @@ let cfg_of_stream (code:stream) : Ll.cfg * (Ll.gid * Ll.gdecl) list  =
       (fun (gs, einsns, insns, term_opt, blks) e ->
         match e with
         | L l ->
+          print_endline@@ "found label: "^l;
            begin match term_opt with
            | None -> 
               if (List.length insns) = 0 then (gs, einsns, [], None, blks)
@@ -42,10 +43,10 @@ let cfg_of_stream (code:stream) : Ll.cfg * (Ll.gid * Ll.gdecl) list  =
            | Some term ->
               (gs, einsns, [], None, (l, {insns; term})::blks)
            end
-        | T t  -> (gs, einsns, [], Some (Llutil.Parsing.gensym "tmn", t), blks)
-        | I (uid,insn)  -> (gs, einsns, (uid,insn)::insns, term_opt, blks)
-        | G (gid,gdecl) ->  ((gid,gdecl)::gs, einsns, insns, term_opt, blks)
-        | E (uid,i) -> (gs, (uid, i)::einsns, insns, term_opt, blks)
+        | T t  -> print_endline@@ "found terminator"; (gs, einsns, [], Some (Llutil.Parsing.gensym "tmn", t), blks)
+        | I (uid,insn)  -> print_endline@@ "found insn with uid: "^uid ; (gs, einsns, (uid,insn)::insns, term_opt, blks)
+        | G (gid,gdecl) -> print_endline@@ "found gid with: "^gid; ((gid,gdecl)::gs, einsns, insns, term_opt, blks)
+        | E (uid,i) -> print_endline@@ "found e with uid: "^uid; (gs, (uid, i)::einsns, insns, term_opt, blks)
       ) ([], [], [], None, []) code
     in
     match term_opt with
@@ -422,12 +423,12 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
     end
 
     | Decl (id, e) -> let (decl_ty, result_uid, stream) = cmp_exp c e in
-    let store_id = gensym "sucuk" in
-    let new_context = Ctxt.add c id (decl_ty, Ll.Id store_id) in
-    (new_context, 
-      [E (store_id, Alloca(decl_ty))]@
-      stream@
-      [I (gensym "sucuk", Store(decl_ty, result_uid, Ll.Id store_id))])
+      let store_id = gensym "sucuk" in
+      let new_context = Ctxt.add c id (decl_ty, Ll.Id store_id) in
+      (new_context, 
+        [E (store_id, Alloca(decl_ty))]@
+        stream@
+        [I (gensym "sucuk", Store(decl_ty, result_uid, Ll.Id store_id))])
 
     | If (e, if_block, else_block) -> 
       let (cnd_op_ty, cnd_op_uid, cnd_stream) = cmp_exp c e in
@@ -461,10 +462,11 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
 
 (* Compile a series of statements *)
 and cmp_block (c:Ctxt.t) (rt:Ll.ty) (stmts:Ast.block) : Ctxt.t * stream =
+  print_endline @@ "Length of stmts: "^(Int.to_string (List.length stmts));
   List.fold_left (fun (c, code) s -> 
       let c, stmt_code = cmp_stmt c rt s in
-      c, code >@ stmt_code
-    ) (c,[]) stmts
+      c, code @ stmt_code
+    ) (c,[]) (stmts)
 
 
 
@@ -592,9 +594,9 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
   
   let args_stream = arg_loop f.elt.args in
 
-  let (some_ctxt, body_stream) = cmp_block ctxt_with_args (cmp_ret_ty f.elt.frtyp) f.elt.body in
+  let (some_ctxt, body_stream) = cmp_block ctxt_with_args (cmp_ret_ty f.elt.frtyp) (f.elt.body) in
 
-  let (body,globals) = cfg_of_stream (List.rev (args_stream@body_stream)) in
+  let (body,globals) = cfg_of_stream ( List.rev (args_stream@body_stream)) in
 
   ({f_ty = arg_types; f_param = arg_uids; f_cfg = body},globals)
 
