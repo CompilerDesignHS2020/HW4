@@ -34,6 +34,7 @@ let cfg_of_stream (code:stream) : Ll.cfg * (Ll.gid * Ll.gdecl) list  =
       (fun (gs, einsns, insns, term_opt, blks) e ->
         match e with
         | L l ->
+          print_endline@@ "found label: "^l;
            begin match term_opt with
            | None -> 
               if (List.length insns) = 0 then (gs, einsns, [], None, blks)
@@ -42,10 +43,10 @@ let cfg_of_stream (code:stream) : Ll.cfg * (Ll.gid * Ll.gdecl) list  =
            | Some term ->
               (gs, einsns, [], None, (l, {insns; term})::blks)
            end
-        | T t  -> (gs, einsns, [], Some (Llutil.Parsing.gensym "tmn", t), blks)
-        | I (uid,insn)  -> (gs, einsns, (uid,insn)::insns, term_opt, blks)
-        | G (gid,gdecl) ->  ((gid,gdecl)::gs, einsns, insns, term_opt, blks)
-        | E (uid,i) -> (gs, (uid, i)::einsns, insns, term_opt, blks)
+        | T t  -> print_endline@@ "found terminator"; (gs, einsns, [], Some (Llutil.Parsing.gensym "tmn", t), blks)
+        | I (uid,insn)  -> print_endline@@ "found insn with uid: "^uid ; (gs, einsns, (uid,insn)::insns, term_opt, blks)
+        | G (gid,gdecl) -> print_endline@@ "found gid with: "^gid; ((gid,gdecl)::gs, einsns, insns, term_opt, blks)
+        | E (uid,i) -> print_endline@@ "found e with uid: "^uid; (gs, (uid, i)::einsns, insns, term_opt, blks)
       ) ([], [], [], None, []) code
     in
     match term_opt with
@@ -308,30 +309,30 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   match exp.elt with
   | CNull(r) -> 
     let uid = gensym "sucuk" in 
-    (I64,Ll.Id(uid), [E(uid, Binop(Add, Ptr(cmp_rty r), Const(0L), Const(0L)))] )
+    (I64,Ll.Id(uid), [I(uid, Binop(Add, Ptr(cmp_rty r), Const(0L), Const(0L)))] )
 
   | CBool(bo) -> 
     let b = if bo then 1L else 0L in 
     let uid = gensym "sucuk" in
-      (I1,Ll.Id(uid), [E(uid, Binop(Add, I1, Const(0L), Const(b)))] )
+      (I1,Ll.Id(uid), [I(uid, Binop(Add, I1, Const(0L), Const(b)))] )
 
   | CInt(i) -> 
     let uid = gensym "sucuk" in 
-    (I64,Ll.Id(uid), [E(uid, Binop(Add, I64, Const(0L), Const(i)))] )
+    (I64,Ll.Id(uid), [I(uid, Binop(Add, I64, Const(0L), Const(i)))] )
 
   | CStr(s) -> 
     let gid = gensym "sucuk" in            
     let uid = gensym "sucuk" in 
-    (Ptr(I8),Ll.Id(uid), 
+    (Ptr(I8),Ll.Gid(gid), 
     [
-      G(gid, (Ptr(Array(String.length s +1 ,I8)), GString(s)));
-      I(uid, Gep(Ptr(Array(String.length s +1 ,I8)), Ll.Gid(gid), [Const(0L); Const(0L)]))
+      G(gid, (Array(String.length s +1, I8), GString(s)));
+      I(uid, Gep(Ptr(I8), Ll.Gid(gid), [Const(0L); Const(0L)]))
     ])
   | Id(i) ->
     let (ll_ty, ll_operand) = Ctxt.lookup i c in
     let uid = gensym "sucuk" in 
     (ll_ty, Ll.Id(uid),[
-      I(uid, Load(ll_ty, ll_operand))
+      I(uid, Load(Ptr(ll_ty), ll_operand))
     ])
 
   | Bop((ast_bop, e1, e2)) -> 
@@ -360,7 +361,7 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
             | Sar -> (Ll.Ashr)
             | _ -> failwith "ll_ret_ty doesn't match ll opcode"
           end in
-          (I64 , Ll.Id(uid),[I(uid, Binop(ll_bop , cmp_ty ll_ret_ty, ll_o1, ll_o2))])
+          (I64 , Ll.Id(uid), ll_stream1@ll_stream2@[I(uid, Binop(ll_bop , cmp_ty ll_ret_ty, ll_o1, ll_o2))])
 
         | (TBool, TBool, TBool) -> let ll_bop = 
           begin match ast_bop with
@@ -368,7 +369,7 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
             | Or -> (Ll.Or)
             | _ -> failwith "ll_ret_ty doesn't match ll opcode"
           end in
-          (I64 , Ll.Id(uid),[I(uid, Binop(ll_bop , cmp_ty ll_ret_ty, ll_o1, ll_o2))])
+          (I64 , Ll.Id(uid),ll_stream1@ll_stream2@[I(uid, Binop(ll_bop , cmp_ty ll_ret_ty, ll_o1, ll_o2))])
 
         | (TBool, TInt, TInt) -> let ll_cnd = 
           begin match ast_bop with
@@ -380,10 +381,18 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
             | Gte -> (Ll.Sge)
             | _ -> failwith "ll_ret_ty doesn't match ll opcode"
           end in
-          (I1 , Ll.Id(uid),[I(uid, Icmp(ll_cnd , cmp_ty ll_ret_ty, ll_o1, ll_o2))])   
+          (I1 , Ll.Id(uid),ll_stream1@ll_stream2@[I(uid, Icmp(ll_cnd , cmp_ty ll_ret_ty, ll_o1, ll_o2))])   
         | _ -> failwith "there are unmatched ast_types cases"
         end
 
+  | Uop(uop, e) ->  
+    let (ll_ty, ll_o, ll_stream) = cmp_exp c e in
+    let uid = gensym "sucuk" in
+      begin match uop with
+      | Neg -> (I64, Ll.Id(uid), ll_stream@[I(uid, Binop(Ll.Sub, I1, Const(0L), ll_o))])
+      | Bitnot -> (I64, Ll.Id(uid), ll_stream@[I(uid, Binop(Ll.Xor, I1, Const(-1L), ll_o))])
+      | Lognot -> (I1, Ll.Id(uid), ll_stream@[I(uid, Binop(Ll.And, I1, Const(0L), ll_o))])
+      end
   | _ -> failwith "ur an fagit"
 
 (* Compile a statement in context c with return typ rt. Return a new context, 
@@ -423,10 +432,11 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
 
     | Decl (id, e) -> let (decl_ty, result_uid, stream) = cmp_exp c e in
       let store_id = gensym "sucuk" in
-      let ll_id = Ll.Id store_id in
-      (Ctxt.add c id (decl_ty, ll_id), [E (store_id, Alloca(decl_ty))]@
+      let new_context = Ctxt.add c id (decl_ty, Ll.Id store_id) in
+      (new_context, 
+        [E (store_id, Alloca(decl_ty))]@
         stream@
-        [E (gensym "sucuk", Store(decl_ty, result_uid, ll_id))])
+        [I (gensym "sucuk", Store(decl_ty, result_uid, Ll.Id store_id))])
 
     | If (e, if_block, else_block) -> 
       let (cnd_op_ty, cnd_op_uid, cnd_stream) = cmp_exp c e in
@@ -528,16 +538,16 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
     
       | _ -> failwith "cnd operand is not Boolean"
     end
-
-    | _ -> (c, [])
+    | _ -> failwith "stmt not implemented"
   end 
 
 (* Compile a series of statements *)
 and cmp_block (c:Ctxt.t) (rt:Ll.ty) (stmts:Ast.block) : Ctxt.t * stream =
+  print_endline @@ "Length of stmts: "^(Int.to_string (List.length stmts));
   List.fold_left (fun (c, code) s -> 
       let c, stmt_code = cmp_stmt c rt s in
-      c, code >@ stmt_code
-    ) (c,[]) stmts
+      c, code @ stmt_code
+    ) (c,[]) (stmts)
 
 
 
@@ -665,9 +675,9 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
   
   let args_stream = arg_loop f.elt.args in
 
-  let (some_ctxt, body_stream) = cmp_block ctxt_with_args (cmp_ret_ty f.elt.frtyp) f.elt.body in
+  let (some_ctxt, body_stream) = cmp_block ctxt_with_args (cmp_ret_ty f.elt.frtyp) (f.elt.body) in
 
-  let (body,globals) = cfg_of_stream (args_stream@body_stream) in
+  let (body,globals) = cfg_of_stream ( List.rev (args_stream@body_stream)) in
 
   ({f_ty = arg_types; f_param = arg_uids; f_cfg = body},globals)
 
