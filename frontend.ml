@@ -427,7 +427,7 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
         [E (store_id, Alloca(ty))]@
         stream@
         [I (gensym "sucuk", Store(ty, result_uid, Ll.Id store_id))])
-    | _ -> (c, [])
+    | _ -> failwith "stmt not implemented"
   end 
 
 (* Compile a series of statements *)
