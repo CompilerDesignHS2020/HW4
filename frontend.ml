@@ -369,9 +369,9 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
             | Or -> (Ll.Or)
             | _ -> failwith "ll_ret_ty doesn't match ll opcode"
           end in
-          (I64 , Ll.Id(uid),ll_stream1@ll_stream2@[I(uid, Binop(ll_bop , cmp_ty ll_ret_ty, ll_o1, ll_o2))])
+          (I1 , Ll.Id(uid),ll_stream1@ll_stream2@[I(uid, Binop(ll_bop , cmp_ty ll_ret_ty, ll_o1, ll_o2))])
 
-        | (TBool, TInt, TInt) -> let ll_cnd = 
+        | (TInt, TInt, TBool) -> let ll_cnd = 
           begin match ast_bop with
             | Eq -> (Ll.Eq)
             | Neq -> (Ll.Ne)
@@ -444,15 +444,15 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       | I1 -> 
         (*then and else blocks are added to ctxt*)
         let (_, then_stream) = cmp_block c rt (if_block) in
-        let (_, else_stream) = cmp_block c rt (if_block) in 
+        let (_, else_stream) = cmp_block c rt (else_block) in 
 
-        let option_id = Ll.Id (gensym "sucuk") in
+        let option_id = gensym "sucuk" in
         let then_lbl = gensym "then" in 
         let else_lbl = gensym "else" in 
         let merge_lbl = gensym "merge" in 
 
-        (c, cnd_stream@[I (gensym "sucuk", Icmp(Eq, cnd_op_ty, cnd_op_uid, Ll.Const(1L)))]@
-          [T (Ll.Cbr(option_id, then_lbl, else_lbl))]@
+        (c, cnd_stream@[I (option_id, Icmp(Eq, cnd_op_ty, cnd_op_uid, Ll.Const(1L)))]@
+          [T (Ll.Cbr(Ll.Id (option_id), then_lbl, else_lbl))]@
           (*then block*)
           [L(then_lbl)]@
           then_stream@
