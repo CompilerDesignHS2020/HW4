@@ -328,6 +328,7 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
       G(gid, (Array(String.length s +1, I8), GString(s)));
       I(uid, Gep(Ptr(I8), Ll.Gid(gid), [Const(0L); Const(0L)]))
     ])
+
   | Id(i) ->
     let (ll_ty, ll_operand) = Ctxt.lookup i c in
     let uid = gensym "sucuk" in 
@@ -394,6 +395,15 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
       | Lognot -> (I1, Ll.Id(uid), ll_stream@[I(uid, Binop(Ll.And, I1, Const(0L), ll_o))])
       end
   | _ -> failwith "ur an fagit"
+
+let rec cmp_exps (c:Ctxt.t) (exps:Ast.exp node list) : ((Ll.ty * Ll.operand) list) * stream =
+  begin match exps with
+    | h::tl -> 
+      let ((rec_ty_op_li), rec_stream_li) = cmp_exps c exps in
+      let (new_ret_ty, new_op, new_stream) = cmp_exp c h in
+      ([new_ret_ty, new_op]@rec_ty_op_li, new_stream@rec_stream_li)
+    | [] -> ([], [])
+  end
 
 (* Compile a statement in context c with return typ rt. Return a new context, 
    possibly extended with new local bindings, and the instruction stream
@@ -466,17 +476,28 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       | _ -> failwith "cnd operand is not Boolean"
     end
 
+    | SCall (e1, arg_list) -> 
+    let (ll_ty, ll_op) = 
+      begin match e1.elt with
+        | Id(i) -> Ctxt.lookup_function i c
+        | _ -> failwith "SCall didn't get an Id"
+      end
+    in
+    let (arg_ty_exp_li, arg_streams) = cmp_exps c arg_list in
+    (c, arg_streams@
+      [I (gensym "sucuk", Ll.Call(ll_ty, ll_op, arg_ty_exp_li))])
+
     | Assn (e1, e2) -> 
-    let store_uid = 
-    begin match e1.elt with
-      | Id(id) -> id 
-      | Index(i1, i2) -> failwith "not implemtend"
-      | _ -> failwith "cannot assign to right hand op"
-    end in
-    let (assn_ty, exp_uid, exp_stream) = cmp_exp c e2 in
-    let (ty, op) = Ctxt.lookup store_uid c in
-    (c, exp_stream@
-      [I (gensym "sucuk", Store(assn_ty, op, Ll.Id store_uid))])
+      let store_uid = 
+      begin match e1.elt with
+        | Id(id) -> id 
+        | Index(i1, i2) -> failwith "not implemtend"
+        | _ -> failwith "cannot assign to right hand op"
+      end in
+      let (assn_ty, exp_uid, exp_stream) = cmp_exp c e2 in
+      let (ty, op) = Ctxt.lookup store_uid c in
+      (c, exp_stream@
+        [I (gensym "sucuk", Store(assn_ty, op, Ll.Id store_uid))])
 
 
     | While (e, body_bl) -> 
