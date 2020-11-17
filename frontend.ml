@@ -322,8 +322,8 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     (I64,Ll.Id(uid), [I(uid, Binop(Add, I64, Const(0L), Const(i)))] )
 
   | CStr(s) -> 
-    let gid = gensym "sucuk" in            
-    let uid = gensym "sucuk" in 
+    let gid = gensym "global_string_const" in            
+    let uid = gensym "string_ptr" in 
     (Ptr(I8),Ll.Id(uid), 
     [
       G(gid, (Array(String.length s +1, I8), GString(s)));
@@ -373,7 +373,7 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
 
       let (arg_ty_exp_li, arg_stream) = cmp_exps c arg_list in
       let ret_uid = gensym "call_ret_uid" in
-      (ret_type, Ll.Id(ret_uid), arg_stream@[I(ret_uid, Ll.Call(ll_fun_type, ll_lbl, arg_ty_exp_li))])
+      (ret_type, Ll.Id(ret_uid), arg_stream@[I(ret_uid, Ll.Call(ret_type, ll_lbl, arg_ty_exp_li))])
       
   | Id(i) ->
     let (ll_ty, ll_operand) = Ctxt.lookup i c in
@@ -523,15 +523,32 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
     end
 
     | SCall (e1, arg_list) -> 
+    (* lookup function label and type*)
     let (ll_ty, ll_op) = 
       begin match e1.elt with
         | Id(i) -> Ctxt.lookup_function i c
         | _ -> failwith "SCall didn't get an Id"
       end
     in
+
+    (* get function ret value *)
+    let (arg_types, ret_type) = 
+    begin match ll_ty with
+    | Ptr (t) -> 
+      begin match t with
+        | Fun(arg_types, ret_type) -> arg_types, ret_type
+        | _ -> failwith "ptr has not type function"
+      end
+    | Fun (ts,t)  -> (ts,t)
+    | _ -> failwith "function has not type function or ptr"
+     end
+    in
+
+    let ll_fun_type = Fun(arg_types, ret_type)  in
+
     let (arg_ty_exp_li, arg_streams) = cmp_exps c arg_list in
     (c, arg_streams@
-      [I (gensym "sucuk", Ll.Call(ll_ty, ll_op, arg_ty_exp_li))])
+      [I (gensym "sucuk", Ll.Call(ret_type, ll_op, arg_ty_exp_li))])
 
     | Assn (e1, e2) -> 
     let store_uid = 
