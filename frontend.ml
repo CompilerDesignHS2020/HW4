@@ -30,7 +30,7 @@ let lift : (uid * insn) list -> stream = List.rev_map (fun (x,i) -> I (x,i))
 
 (* Build a CFG and collection of global variable definitions from a stream *)
 let cfg_of_stream (code:stream) : Ll.cfg * (Ll.gid * Ll.gdecl) list  =
-    let debug = true in
+    let debug = false in
     let gs, einsns, insns, term_opt, blks = List.fold_left
       (fun (gs, einsns, insns, term_opt, blks) e ->
         match e with
@@ -803,12 +803,12 @@ let rec cmp_gexp (c:Ctxt.t) (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) li
     cmp_ty (ast_type_of_ast_exp e.elt)
   in
 
-  let main_ginit = 
+  let (main_ginit, ginit_list) = 
     match e.elt with
-    | CNull(n) -> GNull
-    | CBool(b) -> if b then GInt(1L) else GInt(0L)
-    | CInt(i) -> GInt(i)
-    | CStr(s) -> GString(s)
+    | CNull(n) -> GNull, []
+    | CBool(b) -> if b then GInt(1L), [] else GInt(0L), []
+    | CInt(i) -> GInt(i), []
+    | CStr(s) -> GString(s), []
     | CArr(t,es) ->  failwith "const arrays not implemented yet"
     | _ ->  failwith "tried to initalize global variable with a non constant expression"
   in  
