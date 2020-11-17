@@ -365,17 +365,17 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     (*return ll_ty, ll_op, ll_stream*)
     
     let rec assn_rem_elems rem_elems act_ind =
-      begin match arr_elems with
+      begin match rem_elems with
         | (h::tl) -> 
           let (act_exp_ty, act_exp_op, act_exp_stream) = cmp_exp c h in
           let act_elem_id = gensym "act_elem_id" in
           let ind_list = [Const(0L)]@[Const(Int64.of_int act_ind)] in
-
+          
           act_exp_stream@
           [I(act_elem_id, Gep(new_arr_ty, Ll.Id(base_uid), ind_list))]@
           [I(gensym "store_uid", Store(act_exp_ty, act_exp_op, Ll.Id(act_elem_id)))]@
-          assn_rem_elems tl (act_ind + 1)
-        | _ -> [] 
+          (assn_rem_elems tl (act_ind + 1))
+        | [] -> [] 
       end 
     in
     let assn_stream = assn_rem_elems arr_elems 0 in
