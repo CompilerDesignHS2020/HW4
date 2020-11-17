@@ -346,6 +346,45 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     (*arr_alloc_stream and ptr_Alloc ist other way round than in doc, but should work*)
     (alloc_ty, Ll.Id(ll_arr_pointer_id), size_exp_stream@arr_alloc_stream@ptr_alloc_stream@arr_store_stream)
 
+  | CArr(arr_ty, arr_elems) -> 
+    let arr_elem_length = List.length arr_elems in
+
+    (*create empty array of size length(arr_elems)*)
+    let size_exp = CInt (Int64.of_int (arr_elem_length)) in
+    let (new_arr_ty, new_arr_id, new_arr_stream) = cmp_exp c (no_loc (NewArr (arr_ty, no_loc size_exp))) in
+
+    (* we iterate over the (2)) and (3) for every assn of an array elem:
+      (1) %_x9 = load { i64, [0 x i64] }*, { i64, [0 x i64] }** %_x7 
+      (2) %_index_ptr11 = getelementptr { i64, [0 x  i64] }, 
+          { i64, [0 x i64] }* %_x9, i32 0, i32 1, i32 2
+      (3) store i64 3, i64* %_index_ptr11 *)
+
+    let base_uid = gensym "arr_base_uid" in
+    let load_stream = [I(base_uid , Load(new_arr_ty, new_arr_id))] in
+    
+    (*return ll_ty, ll_op, ll_stream*)
+    
+    let rec assn_rem_elems rem_elems act_ind =
+      begin match arr_elems with
+        | (h::tl) -> 
+          let (act_exp_ty, act_exp_op, act_exp_stream) = cmp_exp c h in
+          let act_elem_id = gensym "act_elem_id" in
+          let ind_list = [Const(0L)]@[Const(Int64.of_int act_ind)] in
+
+          act_exp_stream@
+          [I(act_elem_id, Gep(new_arr_ty, Ll.Id(base_uid), ind_list))]@
+          [I(gensym "store_uid", Store(act_exp_ty, act_exp_op, Ll.Id(act_elem_id)))]@
+          assn_rem_elems tl (act_ind + 1)
+        | _ -> [] 
+      end 
+    in
+    let assn_stream = assn_rem_elems arr_elems 0 in
+    (cmp_ty arr_ty, new_arr_id, new_arr_stream@load_stream@assn_stream)
+
+  | Index (e1, e2) ->
+
+
+    (cmp_ty TInt, Ll.Id("dummy"), [I("dummy", Alloca(cmp_ty TInt))])
   
   | Call (e1, arg_list) -> 
       (* lookup function label and type*)
@@ -438,7 +477,6 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
       | Bitnot -> (I64, Ll.Id(uid), ll_stream@[I(uid, Binop(Ll.Xor, I64, Const(-1L), ll_o))])
       | Lognot -> (I1, Ll.Id(uid), ll_stream@[I(uid, Binop(Ll.And, I1, Const(0L), ll_o))])
       end
-  | _ -> failwith "exp not implemented yet"
 
 and cmp_exps (c:Ctxt.t) (exps:Ast.exp node list) : ((Ll.ty * Ll.operand) list) * stream =
   begin match exps with
