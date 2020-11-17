@@ -198,7 +198,7 @@ let process_files files =
     List.iter process_file files;
 
     ( if !assemble && !link then
-        Platform.link (List.rev !link_files) !executable_filename );
+        Platform.link (List.rev !link_files@["runtime.c"]) !executable_filename );
 
     ( if !assemble && !link && !execute_x86 then
         let ret = run_executable "" !executable_filename in
