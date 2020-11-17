@@ -309,16 +309,16 @@ let oat_alloc_array (t:Ast.ty) (size:Ll.operand) : Ll.ty * operand * stream =
 let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   match exp.elt with
   | CNull(r) -> 
-    let uid = gensym "sucuk" in 
+    let uid = gensym "null_const" in 
     (I64,Ll.Id(uid), [I(uid, Binop(Add, Ptr(cmp_rty r), Const(0L), Const(0L)))] )
 
   | CBool(bo) -> 
     let b = if bo then 1L else 0L in 
-    let uid = gensym "sucuk" in
+    let uid = gensym "bool_const" in
       (I1,Ll.Id(uid), [I(uid, Binop(Add, I1, Const(0L), Const(b)))] )
 
   | CInt(i) -> 
-    let uid = gensym "sucuk" in 
+    let uid = gensym "int_const" in 
     (I64,Ll.Id(uid), [I(uid, Binop(Add, I64, Const(0L), Const(i)))] )
 
   | CStr(s) -> 
@@ -332,7 +332,7 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
 
   | Id(i) ->
     let (ll_ty, ll_operand) = Ctxt.lookup i c in
-    let uid = gensym "sucuk" in 
+    let uid = gensym (i^"_content") in 
     (ll_ty, Ll.Id(uid),[
       I(uid, Load(Ptr(ll_ty), ll_operand))
     ])
@@ -343,7 +343,7 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
       (*rec call, compile both operands first*)
       let (ll_ty1, ll_o1, ll_stream1) = cmp_exp c e1 in
       let (ll_ty2, ll_o2, ll_stream2) = cmp_exp c e2 in
-      let uid = gensym "sucuk" in 
+      let uid = gensym "bop_res" in 
 
       (*compiling ast binop gives us either an ll binop or an ll icmp instruction
       we need to match on the operand & opcode types to decide
@@ -389,10 +389,10 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
 
   | Uop(uop, e) ->  
     let (ll_ty, ll_o, ll_stream) = cmp_exp c e in
-    let uid = gensym "sucuk" in
+    let uid = gensym "uop_res" in
       begin match uop with
-      | Neg -> (I64, Ll.Id(uid), ll_stream@[I(uid, Binop(Ll.Sub, I1, Const(0L), ll_o))])
-      | Bitnot -> (I64, Ll.Id(uid), ll_stream@[I(uid, Binop(Ll.Xor, I1, Const(-1L), ll_o))])
+      | Neg -> (I64, Ll.Id(uid), ll_stream@[I(uid, Binop(Ll.Sub, I64, Const(0L), ll_o))])
+      | Bitnot -> (I64, Ll.Id(uid), ll_stream@[I(uid, Binop(Ll.Xor, I64, Const(-1L), ll_o))])
       | Lognot -> (I1, Ll.Id(uid), ll_stream@[I(uid, Binop(Ll.And, I1, Const(0L), ll_o))])
       end
   | _ -> failwith "exp not implemented yet"
@@ -457,7 +457,7 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
         let (_, then_stream) = cmp_block c rt (if_block) in
         let (_, else_stream) = cmp_block c rt (else_block) in 
 
-        let option_id = gensym "sucuk" in
+        let option_id = gensym "if_compare_res" in
         let then_lbl = gensym "then" in 
         let else_lbl = gensym "else" in 
         let merge_lbl = gensym "merge" in 
