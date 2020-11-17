@@ -838,7 +838,10 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
 let rec cmp_gexp (c:Ctxt.t) (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) list =
 
   let main_ty =
-    cmp_ty (ast_type_of_ast_exp e.elt)
+    match e.elt with
+    | CStr(s) -> Array((String.length s) +1, I8)
+    | element -> cmp_ty (ast_type_of_ast_exp element)
+    
   in
 
   let (main_ginit, ginit_list) = 
