@@ -324,10 +324,10 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   | CStr(s) -> 
     let gid = gensym "sucuk" in            
     let uid = gensym "sucuk" in 
-    (Ptr(I8),Ll.Gid(gid), 
+    (Ptr(I8),Ll.Id(uid), 
     [
       G(gid, (Array(String.length s +1, I8), GString(s)));
-      I(uid, Gep(Ptr(I8), Ll.Gid(gid), [Const(0L); Const(0L)]))
+      I(uid, Gep(Ptr(Array(String.length s +1, I8)), Ll.Gid(gid), [Const(0L); Const(0L)]))
     ])
 
   | Call (e1, arg_list) -> 
@@ -340,21 +340,23 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
       in
 
       (* get function ret value *)
-      let ll_fun_type = 
+      let (arg_types, ret_type) = 
       begin match ll_ty with
       | Ptr (t) -> 
         begin match t with
-          | Fun(arg_types, ret_type) -> Fun(arg_types, ret_type) 
+          | Fun(arg_types, ret_type) -> arg_types, ret_type
           | _ -> failwith "ptr has not type function"
         end
-      | Fun (ts,t)  -> t
+      | Fun (ts,t)  -> (ts,t)
       | _ -> failwith "function has not type function or ptr"
        end
       in
 
+      let ll_fun_type = Fun(arg_types, ret_type)  in
+
       let (arg_ty_exp_li, arg_stream) = cmp_exps c arg_list in
       let ret_uid = gensym "call_ret_uid" in
-      (ll_ty, Ll.Id(ret_uid), arg_stream@[I(ret_uid, Ll.Call(ll_fun_type, ll_lbl, arg_ty_exp_li))])
+      (ret_type, Ll.Id(ret_uid), arg_stream@[I(ret_uid, Ll.Call(ll_fun_type, ll_lbl, arg_ty_exp_li))])
       
   | Id(i) ->
     let (ll_ty, ll_operand) = Ctxt.lookup i c in
@@ -464,7 +466,7 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
     | Ret e -> begin match e with
       | None -> (c, [T(Ll.Ret(rt, None))])
       | Some e -> let (ty, uid, stream) = cmp_exp c e in
-        (c, stream@[T(Ll.Ret(ty, Some uid))])
+        (c, stream@[T(Ll.Ret(rt, Some uid))])
     end
 
     | Decl (id, e) -> let (decl_ty, result_uid, stream) = cmp_exp c e in
@@ -773,8 +775,8 @@ let rec cmp_gexp (c:Ctxt.t) (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) li
     | CBool(b) -> if b then GInt(1L) else GInt(0L)
     | CInt(i) -> GInt(i)
     | CStr(s) -> GString(s)
-    | CArr(t,es) ->  GNull
-    | _ ->  GNull (* TODO: Throw error *)
+    | CArr(t,es) ->  failwith "const arrays not implemented yet"
+    | _ ->  failwith "tried to initalize global variable with a non constant expression"
   in  
 
   let main_gdecl =
