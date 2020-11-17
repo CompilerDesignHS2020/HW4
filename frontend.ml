@@ -337,9 +337,9 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
           | _ -> failwith "SCall didn't get an Id"
         end
       in
-      let (arg_ty_exp_li, arg_streams) = cmp_exps c arg_list in
+      let (arg_ty_exp_li, arg_stream) = cmp_exps c arg_list in
       let ret_uid = gensym "call_ret_uid" in
-      (ll_ty, Ll.Id(ret_uid), arg_streams@[I(ret_uid, Ll.Call(ll_ty, ll_lbl, arg_ty_exp_li))])
+      (ll_ty, Ll.Id(ret_uid), arg_stream@[I(ret_uid, Ll.Call(ll_ty, ll_lbl, arg_ty_exp_li))])
       
   | Id(i) ->
     let (ll_ty, ll_operand) = Ctxt.lookup i c in
@@ -411,7 +411,7 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
 and cmp_exps (c:Ctxt.t) (exps:Ast.exp node list) : ((Ll.ty * Ll.operand) list) * stream =
   begin match exps with
     | h::tl -> 
-      let ((rec_ty_op_li), rec_stream_li) = cmp_exps c exps in
+      let ((rec_ty_op_li), rec_stream_li) = cmp_exps c tl in
       let (new_ret_ty, new_op, new_stream) = cmp_exp c h in
       ([new_ret_ty, new_op]@rec_ty_op_li, new_stream@rec_stream_li)
     | [] -> ([], [])
