@@ -30,11 +30,12 @@ let lift : (uid * insn) list -> stream = List.rev_map (fun (x,i) -> I (x,i))
 
 (* Build a CFG and collection of global variable definitions from a stream *)
 let cfg_of_stream (code:stream) : Ll.cfg * (Ll.gid * Ll.gdecl) list  =
+    let debug = false in
     let gs, einsns, insns, term_opt, blks = List.fold_left
       (fun (gs, einsns, insns, term_opt, blks) e ->
         match e with
         | L l ->
-          print_endline@@ "found label: "^l;
+          if debug then print_endline@@ "found label: "^l;
            begin match term_opt with
            | None -> 
               if (List.length insns) = 0 then (gs, einsns, [], None, blks)
@@ -43,10 +44,10 @@ let cfg_of_stream (code:stream) : Ll.cfg * (Ll.gid * Ll.gdecl) list  =
            | Some term ->
               (gs, einsns, [], None, (l, {insns; term})::blks)
            end
-        | T t  -> print_endline@@ "found terminator"; (gs, einsns, [], Some (Llutil.Parsing.gensym "tmn", t), blks)
-        | I (uid,insn)  -> print_endline@@ "found insn with uid: "^uid ; (gs, einsns, (uid,insn)::insns, term_opt, blks)
-        | G (gid,gdecl) -> print_endline@@ "found gid with: "^gid; ((gid,gdecl)::gs, einsns, insns, term_opt, blks)
-        | E (uid,i) -> print_endline@@ "found e with uid: "^uid; (gs, (uid, i)::einsns, insns, term_opt, blks)
+        | T t  -> if debug then print_endline@@ "found terminator"; (gs, einsns, [], Some (Llutil.Parsing.gensym "tmn", t), blks)
+        | I (uid,insn)  -> if debug then print_endline@@ "found insn with uid: "^uid ; (gs, einsns, (uid,insn)::insns, term_opt, blks)
+        | G (gid,gdecl) -> if debug then print_endline@@ "found gid with: "^gid; ((gid,gdecl)::gs, einsns, insns, term_opt, blks)
+        | E (uid,i) -> if debug then print_endline@@ "found e with uid: "^uid; (gs, (uid, i)::einsns, insns, term_opt, blks)
       ) ([], [], [], None, []) code
     in
     match term_opt with
