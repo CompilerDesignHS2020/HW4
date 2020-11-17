@@ -381,10 +381,29 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     let assn_stream = assn_rem_elems arr_elems 0 in
     (cmp_ty arr_ty, new_arr_id, new_arr_stream@load_stream@assn_stream)
 
-  | Index (e1, e2) ->
+  | Index (arr_exp, ind_exp) ->
+    (*  %_arr12 = load { i64, [0 x i64] }*, { i64, [0 x i64] }** @arr   *)
+    let (arr_ty, arr_id, arr_stream) = cmp_exp c arr_exp in
+    let base_uid = gensym "arr_base_uid" in
+    let load_arr_ptr_stream = [I(base_uid , Load(arr_ty, arr_id))] in
 
+    (* %_index_ptr14 = getelementptr { i64, [0 x i64] }, 
+     { i64, [0 x i64] }* %_arr12, i32 0, i32 1, i32 2  *)
+    let (_, ind_uid, ind_stream) = cmp_exp c ind_exp in
+    let ind_ptr_id = gensym "ind_ptr_id" in
+    let gep_stream = [I(ind_ptr_id, Gep(arr_ty, Ll.Id(base_uid), [Const(0L); ind_uid]))] in
 
-    (cmp_ty TInt, Ll.Id("dummy"), [I("dummy", Alloca(cmp_ty TInt))])
+    (*  %_index15 = load i64, i64* %_index_ptr14  *)
+    let elem_id = gensym "ind_ptr_id" in
+    let inner_type = 
+    begin match arr_ty with
+      | Array(_,ty) -> ty
+      | _ -> failwith "No Array type"
+    end 
+    in
+    let load_elem_stream = [I(elem_id , Load(inner_type , Ll.Id(ind_ptr_id)))] in
+
+    (arr_ty, Ll.Id(elem_id), arr_stream@load_arr_ptr_stream@gep_stream@load_elem_stream)
   
   | Call (e1, arg_list) -> 
       (* lookup function label and type*)
