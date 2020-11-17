@@ -30,11 +30,12 @@ let lift : (uid * insn) list -> stream = List.rev_map (fun (x,i) -> I (x,i))
 
 (* Build a CFG and collection of global variable definitions from a stream *)
 let cfg_of_stream (code:stream) : Ll.cfg * (Ll.gid * Ll.gdecl) list  =
+    let debug = true in
     let gs, einsns, insns, term_opt, blks = List.fold_left
       (fun (gs, einsns, insns, term_opt, blks) e ->
         match e with
         | L l ->
-          print_endline@@ "found label: "^l;
+          if debug then print_endline@@ "found label: "^l;
            begin match term_opt with
            | None -> 
               if (List.length insns) = 0 then (gs, einsns, [], None, blks)
@@ -43,10 +44,10 @@ let cfg_of_stream (code:stream) : Ll.cfg * (Ll.gid * Ll.gdecl) list  =
            | Some term ->
               (gs, einsns, [], None, (l, {insns; term})::blks)
            end
-        | T t  -> print_endline@@ "found terminator"; (gs, einsns, [], Some (Llutil.Parsing.gensym "tmn", t), blks)
-        | I (uid,insn)  -> print_endline@@ "found insn with uid: "^uid ; (gs, einsns, (uid,insn)::insns, term_opt, blks)
-        | G (gid,gdecl) -> print_endline@@ "found gid with: "^gid; ((gid,gdecl)::gs, einsns, insns, term_opt, blks)
-        | E (uid,i) -> print_endline@@ "found e with uid: "^uid; (gs, (uid, i)::einsns, insns, term_opt, blks)
+        | T t  -> if debug then print_endline@@ "found terminator"; (gs, einsns, [], Some (Llutil.Parsing.gensym "tmn", t), blks)
+        | I (uid,insn)  -> if debug then print_endline@@ "found insn with uid: "^uid ; (gs, einsns, (uid,insn)::insns, term_opt, blks)
+        | G (gid,gdecl) -> if debug then print_endline@@ "found gid with: "^gid; ((gid,gdecl)::gs, einsns, insns, term_opt, blks)
+        | E (uid,i) -> if debug then print_endline@@ "found e with uid: "^uid; (gs, (uid, i)::einsns, insns, term_opt, blks)
       ) ([], [], [], None, []) code
     in
     match term_opt with
@@ -394,7 +395,7 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
       | Bitnot -> (I64, Ll.Id(uid), ll_stream@[I(uid, Binop(Ll.Xor, I1, Const(-1L), ll_o))])
       | Lognot -> (I1, Ll.Id(uid), ll_stream@[I(uid, Binop(Ll.And, I1, Const(0L), ll_o))])
       end
-  | _ -> failwith "ur an fagit"
+  | _ -> failwith "exp not implemented yet"
 
 let rec cmp_exps (c:Ctxt.t) (exps:Ast.exp node list) : ((Ll.ty * Ll.operand) list) * stream =
   begin match exps with
@@ -441,7 +442,7 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
     end
 
     | Decl (id, e) -> let (decl_ty, result_uid, stream) = cmp_exp c e in
-      let store_id = gensym "sucuk" in
+      let store_id = gensym (id^"_var") in
       let new_context = Ctxt.add c id (decl_ty, Ll.Id store_id) in
       (new_context, 
         [E (store_id, Alloca(decl_ty))]@
@@ -488,16 +489,16 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       [I (gensym "sucuk", Ll.Call(ll_ty, ll_op, arg_ty_exp_li))])
 
     | Assn (e1, e2) -> 
-      let store_uid = 
-      begin match e1.elt with
-        | Id(id) -> id 
-        | Index(i1, i2) -> failwith "not implemtend"
-        | _ -> failwith "cannot assign to right hand op"
-      end in
-      let (assn_ty, exp_uid, exp_stream) = cmp_exp c e2 in
-      let (ty, op) = Ctxt.lookup store_uid c in
-      (c, exp_stream@
-        [I (gensym "sucuk", Store(assn_ty, op, Ll.Id store_uid))])
+    let store_uid = 
+    begin match e1.elt with
+      | Id(id) -> id 
+      | Index(i1, i2) -> failwith "not implemtend"
+      | _ -> failwith "cannot assign to right hand op"
+    end in
+    let (exp_ty, exp_uid, exp_stream) = cmp_exp c e2 in
+    let (ty, ptr_op) = Ctxt.lookup store_uid c in
+    (c, exp_stream@
+      [I (gensym "sucuk", Store(exp_ty, exp_uid, ptr_op))])
 
 
     | While (e, body_bl) -> 
@@ -506,16 +507,16 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       | I1 -> 
         let (_, body_stream) = cmp_block c rt (body_bl) in
 
-        let option_id = Ll.Id (gensym "sucuk") in
-        let pre_lbl = gensym "pre" in 
-        let body_lbl = gensym "else" in 
-        let post_lbl = gensym "post" in 
+        let option_id = gensym "sucuk" in
+        let pre_lbl = gensym "while_pre" in 
+        let body_lbl = gensym "while_body" in 
+        let post_lbl = gensym "while_post" in 
 
         (*concatenating insns together*)
         (c, [T (Ll.Br(pre_lbl))]@
           [L(pre_lbl)]@
-          cnd_stream@[I (gensym "sucuk", Icmp(Eq, cnd_op_ty, cnd_op_uid, Ll.Const(1L)))]@
-          [T (Ll.Cbr(option_id, body_lbl, post_lbl))]@
+          cnd_stream@[I (option_id, Icmp(Eq, cnd_op_ty, cnd_op_uid, Ll.Const(1L)))]@
+          [T (Ll.Cbr(Ll.Id (option_id), body_lbl, post_lbl))]@
           (*body block*)
           [L(body_lbl)]@
           body_stream@
@@ -547,25 +548,33 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
           (I1, Ll.Id(rand_id),  [I(rand_id, Binop(Add, I1, Const(1L), Const(0L)))])
       end in
 
+      (* compile increment, note: context is not updated*)
+      let inc_stream = 
+      begin match inc with
+        | None -> []
+        | Some inc_stmt -> let (inc_ctxt, stream) = cmp_stmt ctxt rt inc_stmt in stream
+      end
+      in
       begin match cnd_op_ty with
       | I1 -> 
         (*body block is added to ctxt*)
         let (_, body_stream) = cmp_block ctxt rt (body_bl) in
 
-        let option_id = Ll.Id (gensym "sucuk") in
-        let pre_lbl = gensym "pre" in 
-        let body_lbl = gensym "else" in 
-        let post_lbl = gensym "post" in 
+        let option_id = gensym "sucuk" in
+        let pre_lbl = gensym "for_pre" in 
+        let body_lbl = gensym "for_body" in 
+        let post_lbl = gensym "for_post" in 
 
         (*concatenating insns together*)
         (ctxt, vdecls_stream@
           [T (Ll.Br(pre_lbl))]@
           [L(pre_lbl)]@
-          cnd_stream@[I (gensym "sucuk", Icmp(Eq, cnd_op_ty, cnd_op_uid, Ll.Const(1L)))]@
-          [T (Ll.Cbr(option_id, body_lbl, post_lbl))]@
+          cnd_stream@[I (option_id, Icmp(Eq, cnd_op_ty, cnd_op_uid, Ll.Const(1L)))]@
+          [T (Ll.Cbr(Ll.Id (option_id), body_lbl, post_lbl))]@
           (*body block*)
           [L(body_lbl)]@
           body_stream@
+          inc_stream@
           [T (Ll.Br(pre_lbl))]@
           (*post*)
           [L(post_lbl)])
@@ -577,7 +586,6 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
 
 (* Compile a series of statements *)
 and cmp_block (c:Ctxt.t) (rt:Ll.ty) (stmts:Ast.block) : Ctxt.t * stream =
-  print_endline @@ "Length of stmts: "^(Int.to_string (List.length stmts));
   List.fold_left (fun (c, code) s -> 
       let c, stmt_code = cmp_stmt c rt s in
       c, code @ stmt_code
