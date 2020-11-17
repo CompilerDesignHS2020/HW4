@@ -330,6 +330,23 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
       I(uid, Gep(Ptr(I8), Ll.Gid(gid), [Const(0L); Const(0L)]))
     ])
 
+  | NewArr(arr_ty, size_exp) ->
+    (*%_raw_array5 = call i64*  @oat_alloc_array(i64 3)  *)
+    (*%_array6 = bitcast i64* %_raw_array5 to { i64, [0 x i64] }* *)
+    let (_, ll_size_id, size_exp_stream) = cmp_exp c size_exp in
+    let (alloc_ty, arr_alloc_id, arr_alloc_stream) = oat_alloc_array arr_ty ll_size_id in
+
+    (* %_x7 = alloca { i64, [0 x i64] }*  *)
+    let ll_arr_pointer_id = gensym "arr_id" in
+    let ptr_alloc_stream = [I(ll_arr_pointer_id ,Alloca(alloc_ty))] in
+
+    (* store { i64, [0 x i64]}* %_array6, { i64, [0 x i64] }** %_x7 *)
+    let arr_store_stream = [I(ll_arr_pointer_id ,Store(alloc_ty, arr_alloc_id, Ll.Id(ll_arr_pointer_id)))] in
+
+    (*arr_alloc_stream and ptr_Alloc ist other way round than in doc, but should work*)
+    (alloc_ty, Ll.Id(ll_arr_pointer_id), size_exp_stream@arr_alloc_stream@ptr_alloc_stream@arr_store_stream)
+
+  
   | Call (e1, arg_list) -> 
       let (ll_ty, ll_lbl) = 
         begin match e1.elt with
