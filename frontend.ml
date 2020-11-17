@@ -331,15 +331,30 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     ])
 
   | Call (e1, arg_list) -> 
+      (* lookup function label and type*)
       let (ll_ty, ll_lbl) = 
         begin match e1.elt with
           | Id(i) -> Ctxt.lookup_function i c
           | _ -> failwith "SCall didn't get an Id"
         end
       in
+
+      (* get function ret value *)
+      let ll_fun_type = 
+      begin match ll_ty with
+      | Ptr (t) -> 
+        begin match t with
+          | Fun(arg_types, ret_type) -> Fun(arg_types, ret_type) 
+          | _ -> failwith "ptr has not type function"
+        end
+      | Fun (ts,t)  -> t
+      | _ -> failwith "function has not type function or ptr"
+       end
+      in
+
       let (arg_ty_exp_li, arg_stream) = cmp_exps c arg_list in
       let ret_uid = gensym "call_ret_uid" in
-      (ll_ty, Ll.Id(ret_uid), arg_stream@[I(ret_uid, Ll.Call(ll_ty, ll_lbl, arg_ty_exp_li))])
+      (ll_ty, Ll.Id(ret_uid), arg_stream@[I(ret_uid, Ll.Call(ll_fun_type, ll_lbl, arg_ty_exp_li))])
       
   | Id(i) ->
     let (ll_ty, ll_operand) = Ctxt.lookup i c in
