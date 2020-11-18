@@ -907,11 +907,14 @@ let rec cmp_gexp (c:Ctxt.t) (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) li
         end
       in 
       let (gdecl_list, addit_list) = cmp_gexps es in
-      let array_size = List.length es in
-      (GStruct(
-      [(I64, GInt(Int64.of_int array_size)); 
-      (Array((array_size, cmp_ty inner_ty)), GArray(gdecl_list));
-      ]), addit_list)
+      let arr_size = List.length es in
+      let cmpled_inner_ty = cmp_ty inner_ty in
+      let arr_initialisation = GStruct([(I64, GInt(Int64.of_int arr_size)); 
+      (Array((arr_size, cmpled_inner_ty)), GArray(gdecl_list))])
+      in
+      let arr_gid = gensym "arr_gid" in
+      let bitc_ins = GBitcast(Struct([I64; Array(arr_size, cmpled_inner_ty)]), GGid arr_gid, Struct([I64; Array(0, cmpled_inner_ty)])) in
+      (bitc_ins, addit_list@[(arr_gid, (Struct([I64; Array(arr_size, cmpled_inner_ty)]), arr_initialisation))])
     | _ ->  failwith "tried to initalize global variable with a non constant expression"
   in  
 
