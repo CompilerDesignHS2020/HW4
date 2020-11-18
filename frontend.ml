@@ -30,7 +30,7 @@ let lift : (uid * insn) list -> stream = List.rev_map (fun (x,i) -> I (x,i))
 
 (* Build a CFG and collection of global variable definitions from a stream *)
 let cfg_of_stream (code:stream) : Ll.cfg * (Ll.gid * Ll.gdecl) list  =
-    let debug = true in
+    let debug = false in
     let gs, einsns, insns, term_opt, blks = List.fold_left
       (fun (gs, einsns, insns, term_opt, blks) e ->
         match e with
@@ -322,12 +322,12 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     (I64,Ll.Id(uid), [I(uid, Binop(Add, I64, Const(0L), Const(i)))] )
 
   | CStr(s) -> 
-    let gid = gensym "sucuk" in            
-    let uid = gensym "sucuk" in 
-    (Ptr(I8),Ll.Gid(gid), 
+    let gid = gensym "global_string_const" in            
+    let uid = gensym "string_ptr" in 
+    (Ptr(I8),Ll.Id(uid), 
     [
       G(gid, (Array(String.length s +1, I8), GString(s)));
-      I(uid, Gep(Ptr(I8), Ll.Gid(gid), [Const(0L); Const(0L)]))
+      I(uid, Gep(Ptr(Array(String.length s +1, I8)), Ll.Gid(gid), [Const(0L); Const(0L)]))
     ])
 
   | NewArr(arr_ty, size_exp) ->
@@ -337,14 +337,18 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     let (alloc_ty, arr_alloc_id, arr_alloc_stream) = oat_alloc_array arr_ty ll_size_id in
 
     (* %_x7 = alloca { i64, [0 x i64] }*  *)
-    let ll_arr_pointer_id = gensym "arr_pointer_id" in
+    (*
+    let ll_arr_pointer_id = gensym "arr_id" in
     let ptr_alloc_stream = [I(ll_arr_pointer_id ,Alloca(alloc_ty))] in
+    *)
 
     (* store { i64, [0 x i64]}* %_array6, { i64, [0 x i64] }** %_x7 *)
+    (*
     let arr_store_stream = [I(ll_arr_pointer_id ,Store(alloc_ty, arr_alloc_id, Ll.Id(ll_arr_pointer_id)))] in
-
+    *)
+    print_endline @@ string_of_ty alloc_ty;
     (*arr_alloc_stream and ptr_Alloc ist other way round than in doc, but should work*)
-    (alloc_ty, Ll.Id(ll_arr_pointer_id), size_exp_stream@arr_alloc_stream@ptr_alloc_stream@arr_store_stream)
+    (alloc_ty, arr_alloc_id, size_exp_stream@arr_alloc_stream)
 
   | CArr(arr_ty, arr_elems) -> 
     let arr_elem_length = List.length arr_elems in
@@ -365,17 +369,17 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     (*return ll_ty, ll_op, ll_stream*)
     
     let rec assn_rem_elems rem_elems act_ind =
-      begin match arr_elems with
+      begin match rem_elems with
         | (h::tl) -> 
           let (act_exp_ty, act_exp_op, act_exp_stream) = cmp_exp c h in
           let act_elem_id = gensym "act_elem_id" in
           let ind_list = [Const(0L)]@[Const(Int64.of_int act_ind)] in
-
+          
           act_exp_stream@
           [I(act_elem_id, Gep(new_arr_ty, Ll.Id(base_uid), ind_list))]@
           [I(gensym "store_uid", Store(act_exp_ty, act_exp_op, Ll.Id(act_elem_id)))]@
-          assn_rem_elems tl (act_ind + 1)
-        | _ -> [] 
+          (assn_rem_elems tl (act_ind + 1))
+        | [] -> [] 
       end 
     in
     let assn_stream = assn_rem_elems arr_elems 0 in
@@ -383,27 +387,30 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
 
   | Index (arr_exp, ind_exp) ->
     (*  %_arr12 = load { i64, [0 x i64] }*, { i64, [0 x i64] }** @arr   *)
-    let (arr_ty, arr_id, arr_stream) = cmp_exp c arr_exp in
+    let (arr_ty, arr_base_ptr, arr_stream) = cmp_exp c arr_exp in
+    (*
     let base_uid = gensym "arr_base_uid" in
     let load_arr_ptr_stream = [I(base_uid , Load(arr_ty, arr_id))] in
+    *)
 
     (* %_index_ptr14 = getelementptr { i64, [0 x i64] }, 
      { i64, [0 x i64] }* %_arr12, i32 0, i32 1, i32 2  *)
     let (_, ind_uid, ind_stream) = cmp_exp c ind_exp in
     let ind_ptr_id = gensym "ind_ptr_id" in
-    let gep_stream = [I(ind_ptr_id, Gep(arr_ty, Ll.Id(base_uid), [Const(0L); ind_uid]))] in
+    let gep_stream = [I(ind_ptr_id, Gep(arr_ty, arr_base_ptr, [Const(0L); Const(1L); ind_uid]))] in
 
     (*  %_index15 = load i64, i64* %_index_ptr14  *)
-    let elem_id = gensym "ind_ptr_id" in
+    let elem_id = gensym "elem_id" in
+    print_endline @@ string_of_ty arr_ty;
     let inner_type = 
     begin match arr_ty with
-      | Array(_,ty) -> ty
-      | _ -> failwith "No Array type"
+      | Ptr(Struct([I64; Array(n,t)])) -> t 
+      | _ -> failwith "wrong inner type"
     end 
     in
     let load_elem_stream = [I(elem_id , Load(inner_type , Ll.Id(ind_ptr_id)))] in
 
-    (arr_ty, Ll.Id(elem_id), arr_stream@load_arr_ptr_stream@gep_stream@load_elem_stream)
+    (inner_type, Ll.Id(elem_id), arr_stream@ind_stream@gep_stream@load_elem_stream)
   
   | Call (e1, arg_list) -> 
       (* lookup function label and type*)
@@ -415,21 +422,23 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
       in
 
       (* get function ret value *)
-      let ll_fun_type = 
+      let (arg_types, ret_type) = 
       begin match ll_ty with
       | Ptr (t) -> 
         begin match t with
-          | Fun(arg_types, ret_type) -> Fun(arg_types, ret_type) 
+          | Fun(arg_types, ret_type) -> arg_types, ret_type
           | _ -> failwith "ptr has not type function"
         end
-      | Fun (ts,t)  -> t
+      | Fun (ts,t)  -> (ts,t)
       | _ -> failwith "function has not type function or ptr"
        end
       in
 
+      let ll_fun_type = Fun(arg_types, ret_type)  in
+
       let (arg_ty_exp_li, arg_stream) = cmp_exps c arg_list in
       let ret_uid = gensym "call_ret_uid" in
-      (ll_ty, Ll.Id(ret_uid), arg_stream@[I(ret_uid, Ll.Call(ll_fun_type, ll_lbl, arg_ty_exp_li))])
+      (ret_type, Ll.Id(ret_uid), arg_stream@[I(ret_uid, Ll.Call(ret_type, ll_lbl, arg_ty_exp_li))])
       
   | Id(i) ->
     let (ll_ty, ll_operand) = Ctxt.lookup i c in
@@ -538,7 +547,7 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
     | Ret e -> begin match e with
       | None -> (c, [T(Ll.Ret(rt, None))])
       | Some e -> let (ty, uid, stream) = cmp_exp c e in
-        (c, stream@[T(Ll.Ret(ty, Some uid))])
+        (c, stream@[T(Ll.Ret(rt, Some uid))])
     end
 
     | Decl (id, e) -> let (decl_ty, result_uid, stream) = cmp_exp c e in
@@ -578,15 +587,32 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
     end
 
     | SCall (e1, arg_list) -> 
+    (* lookup function label and type*)
     let (ll_ty, ll_op) = 
       begin match e1.elt with
         | Id(i) -> Ctxt.lookup_function i c
         | _ -> failwith "SCall didn't get an Id"
       end
     in
+
+    (* get function ret value *)
+    let (arg_types, ret_type) = 
+    begin match ll_ty with
+    | Ptr (t) -> 
+      begin match t with
+        | Fun(arg_types, ret_type) -> arg_types, ret_type
+        | _ -> failwith "ptr has not type function"
+      end
+    | Fun (ts,t)  -> (ts,t)
+    | _ -> failwith "function has not type function or ptr"
+     end
+    in
+
+    let ll_fun_type = Fun(arg_types, ret_type)  in
+
     let (arg_ty_exp_li, arg_streams) = cmp_exps c arg_list in
     (c, arg_streams@
-      [I (gensym "sucuk", Ll.Call(ll_ty, ll_op, arg_ty_exp_li))])
+      [I (gensym "sucuk", Ll.Call(ret_type, ll_op, arg_ty_exp_li))])
 
     | Assn (e1, e2) -> 
     let store_uid = 
@@ -838,17 +864,20 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
 let rec cmp_gexp (c:Ctxt.t) (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) list =
 
   let main_ty =
-    cmp_ty (ast_type_of_ast_exp e.elt)
+    match e.elt with
+    | CStr(s) -> Array((String.length s) +1, I8)
+    | element -> cmp_ty (ast_type_of_ast_exp element)
+    
   in
 
-  let main_ginit = 
+  let (main_ginit, ginit_list) = 
     match e.elt with
-    | CNull(n) -> GNull
-    | CBool(b) -> if b then GInt(1L) else GInt(0L)
-    | CInt(i) -> GInt(i)
-    | CStr(s) -> GString(s)
-    | CArr(t,es) ->  GNull
-    | _ ->  GNull (* TODO: Throw error *)
+    | CNull(n) -> GNull, []
+    | CBool(b) -> if b then GInt(1L), [] else GInt(0L), []
+    | CInt(i) -> GInt(i), []
+    | CStr(s) -> GString(s), []
+    | CArr(t,es) ->  failwith "const arrays not implemented yet"
+    | _ ->  failwith "tried to initalize global variable with a non constant expression"
   in  
 
   let main_gdecl =
