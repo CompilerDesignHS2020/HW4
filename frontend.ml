@@ -883,7 +883,7 @@ let rec cmp_gexp (c:Ctxt.t) (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) li
 
   let main_ty =
     match e.elt with
-    | CStr(s) -> Array((String.length s) +1, I8)
+    | CStr(s) -> Ptr(I8)
     | element -> cmp_ty (ast_type_of_ast_exp element)
     
   in
@@ -893,7 +893,11 @@ let rec cmp_gexp (c:Ctxt.t) (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) li
     | CNull(n) -> GNull, []
     | CBool(b) -> if b then GInt(1L), [] else GInt(0L), []
     | CInt(i) -> GInt(i), []
-    | CStr(s) -> GString(s), []
+    | CStr(s) -> 
+      let string_gid = gensym "str_gid" in
+      let str_initialization = GString(s) in
+      let bitch_ins = GBitcast(Ptr(Array((String.length s)+1, I8)), GGid string_gid, Ptr(I8)) in
+      (bitch_ins, [string_gid, (Array((String.length s)+1, I8), str_initialization) ])
     | CArr(inner_ty,es) ->  
       let rec cmp_gexps rem_gexp =
         begin match rem_gexp with
