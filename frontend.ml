@@ -346,9 +346,9 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     (*
     let arr_store_stream = [I(ll_arr_pointer_id ,Store(alloc_ty, arr_alloc_id, Ll.Id(ll_arr_pointer_id)))] in
     *)
-    print_endline @@ string_of_ty alloc_ty;
+    (*print_endline @@ string_of_ty alloc_ty;*)
     (*arr_alloc_stream and ptr_Alloc ist other way round than in doc, but should work*)
-    (alloc_ty, arr_alloc_id, size_exp_stream@arr_alloc_stream)
+    (alloc_ty, arr_alloc_id, size_exp_stream@(List.rev arr_alloc_stream))
 
   | CArr(arr_ty, arr_elems) -> 
     let arr_elem_length = List.length arr_elems in
@@ -401,14 +401,14 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
 
     (*  %_index15 = load i64, i64* %_index_ptr14  *)
     let elem_id = gensym "elem_id" in
-    print_endline @@ string_of_ty arr_ty;
+    (*print_endline @@ string_of_ty arr_ty;*)
     let inner_type = 
     begin match arr_ty with
       | Ptr(Struct([I64; Array(n,t)])) -> t 
       | _ -> failwith "wrong inner type"
     end 
     in
-    let load_elem_stream = [I(elem_id , Load(inner_type , Ll.Id(ind_ptr_id)))] in
+    let load_elem_stream = [I(elem_id , Load(Ptr(inner_type) , Ll.Id(ind_ptr_id)))] in
 
     (inner_type, Ll.Id(elem_id), arr_stream@ind_stream@gep_stream@load_elem_stream)
   
@@ -615,16 +615,36 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       [I (gensym "sucuk", Ll.Call(ret_type, ll_op, arg_ty_exp_li))])
 
     | Assn (e1, e2) -> 
-    let store_uid = 
-    begin match e1.elt with
-      | Id(id) -> id 
-      | Index(i1, i2) -> failwith "not implemtend"
-      | _ -> failwith "cannot assign to right hand op"
-    end in
-    let (exp_ty, exp_uid, exp_stream) = cmp_exp c e2 in
-    let (ty, ptr_op) = Ctxt.lookup store_uid c in
-    (c, exp_stream@
-      [I (gensym "sucuk", Store(exp_ty, exp_uid, ptr_op))])
+
+      let (exp_ty, exp_uid, exp_stream) = cmp_exp c e2 in
+      begin match e1.elt with
+        | Id(store_uid) -> 
+          let (ty, ptr_op) = Ctxt.lookup store_uid c in
+            (c, exp_stream@
+            [I (gensym "sucuk", Store(exp_ty, exp_uid, ptr_op))])
+        | Index(arr_exp, ind_exp) -> 
+          (*  %_arr12 = load { i64, [0 x i64] }*, { i64, [0 x i64] }** @arr   *)
+          let (arr_ty, arr_base_ptr, arr_stream) = cmp_exp c arr_exp in
+
+          (* %_index_ptr14 = getelementptr { i64, [0 x i64] }, 
+          { i64, [0 x i64] }* %_arr12, i32 0, i32 1, i32 2  *)
+          let (_, ind_uid, ind_stream) = cmp_exp c ind_exp in
+          let ind_ptr_id = gensym "ind_ptr_id" in
+          let gep_stream = [I(ind_ptr_id, Gep(arr_ty, arr_base_ptr, [Const(0L); Const(1L); ind_uid]))] in
+
+          (*  %_index15 = load i64, i64* %_index_ptr14  *)
+
+          let inner_type = 
+          begin match arr_ty with
+            | Ptr(Struct([I64; Array(n,t)])) -> t 
+            | _ -> failwith "wrong inner type"
+          end 
+          in
+
+          (c, exp_stream@arr_stream@ind_stream@gep_stream@[I (gensym "sucuk", Store(inner_type, exp_uid, Ll.Id(ind_ptr_id)))])
+        | _ -> failwith "cannot assign to right hand op"
+      end 
+
 
 
     | While (e, body_bl) -> 
