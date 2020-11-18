@@ -894,7 +894,22 @@ let rec cmp_gexp (c:Ctxt.t) (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) li
     | CBool(b) -> if b then GInt(1L), [] else GInt(0L), []
     | CInt(i) -> GInt(i), []
     | CStr(s) -> GString(s), []
-    | CArr(t,es) ->  failwith "const arrays not implemented yet"
+    | CArr(inner_ty,es) ->  
+      let rec cmp_gexps rem_gexp =
+        begin match rem_gexp with
+          | h::tl -> 
+            let (elem_gdecl, cmped_elems) = cmp_gexp c h in
+            let (rem_gdecls, rem_elems) = cmp_gexps tl in
+              ([elem_gdecl]@rem_gdecls, cmped_elems@rem_elems)
+          | [] -> ([] ,[])
+        end
+      in 
+      let (gdecl_list, addit_list) = cmp_gexps es in
+      let array_size = List.length es in
+      (GStruct(
+      [(I64, GInt(Int64.of_int array_size)); 
+      (Array((array_size, cmp_ty inner_ty)), GArray(gdecl_list));
+      ]), addit_list)
     | _ ->  failwith "tried to initalize global variable with a non constant expression"
   in  
 
@@ -902,7 +917,7 @@ let rec cmp_gexp (c:Ctxt.t) (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) li
     (main_ty, main_ginit)
   in
 
-  (main_gdecl,[])
+  (main_gdecl, ginit_list)
 
 (* Oat internals function context ------------------------------------------- *)
 let internals = [
