@@ -337,7 +337,7 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     let (alloc_ty, arr_alloc_id, arr_alloc_stream) = oat_alloc_array arr_ty ll_size_id in
 
     (* %_x7 = alloca { i64, [0 x i64] }*  *)
-    let ll_arr_pointer_id = gensym "arr_id" in
+    let ll_arr_pointer_id = gensym "arr_pointer_id" in
     let ptr_alloc_stream = [I(ll_arr_pointer_id ,Alloca(alloc_ty))] in
 
     (* store { i64, [0 x i64]}* %_array6, { i64, [0 x i64] }** %_x7 *)
