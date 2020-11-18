@@ -352,19 +352,17 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
 
   | CArr(arr_ty, arr_elems) -> 
     let arr_elem_length = List.length arr_elems in
-
+    
     (*create empty array of size length(arr_elems)*)
     let size_exp = CInt (Int64.of_int (arr_elem_length)) in
-    let (new_arr_ty, new_arr_id, new_arr_stream) = cmp_exp c (no_loc (NewArr (arr_ty, no_loc size_exp))) in
-
+    let (new_arr_ty, base_uid, new_arr_stream) = cmp_exp c (no_loc (NewArr (arr_ty, no_loc size_exp))) in
+    
     (* we iterate over the (2)) and (3) for every assn of an array elem:
       (1) %_x9 = load { i64, [0 x i64] }*, { i64, [0 x i64] }** %_x7 
       (2) %_index_ptr11 = getelementptr { i64, [0 x  i64] }, 
           { i64, [0 x i64] }* %_x9, i32 0, i32 1, i32 2
       (3) store i64 3, i64* %_index_ptr11 *)
 
-    let base_uid = gensym "arr_base_uid" in
-    let load_stream = [I(base_uid , Load(new_arr_ty, new_arr_id))] in
     
     (*return ll_ty, ll_op, ll_stream*)
     
@@ -372,18 +370,18 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
       begin match rem_elems with
         | (h::tl) -> 
           let (act_exp_ty, act_exp_op, act_exp_stream) = cmp_exp c h in
-          let act_elem_id = gensym "act_elem_id" in
-          let ind_list = [Const(0L)]@[Const(Int64.of_int act_ind)] in
+          let act_elem_ptr = gensym "act_elem_ptr" in
+          let ind_list = [Const(0L)]@[Const(1L)]@[Const(Int64.of_int act_ind)] in
           
           act_exp_stream@
-          [I(act_elem_id, Gep(new_arr_ty, Ll.Id(base_uid), ind_list))]@
-          [I(gensym "store_uid", Store(act_exp_ty, act_exp_op, Ll.Id(act_elem_id)))]@
+          [I(act_elem_ptr, Gep(new_arr_ty, base_uid, ind_list))]@
+          [I(gensym "sucuk", Store(act_exp_ty, act_exp_op, Ll.Id(act_elem_ptr)))]@
           (assn_rem_elems tl (act_ind + 1))
         | [] -> [] 
       end 
     in
     let assn_stream = assn_rem_elems arr_elems 0 in
-    (cmp_ty arr_ty, new_arr_id, new_arr_stream@load_stream@assn_stream)
+    (new_arr_ty, base_uid, new_arr_stream@assn_stream)
 
   | Index (arr_exp, ind_exp) ->
     (*  %_arr12 = load { i64, [0 x i64] }*, { i64, [0 x i64] }** @arr   *)
