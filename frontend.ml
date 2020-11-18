@@ -337,14 +337,18 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     let (alloc_ty, arr_alloc_id, arr_alloc_stream) = oat_alloc_array arr_ty ll_size_id in
 
     (* %_x7 = alloca { i64, [0 x i64] }*  *)
+    (*
     let ll_arr_pointer_id = gensym "arr_id" in
     let ptr_alloc_stream = [I(ll_arr_pointer_id ,Alloca(alloc_ty))] in
+    *)
 
     (* store { i64, [0 x i64]}* %_array6, { i64, [0 x i64] }** %_x7 *)
+    (*
     let arr_store_stream = [I(ll_arr_pointer_id ,Store(alloc_ty, arr_alloc_id, Ll.Id(ll_arr_pointer_id)))] in
-
+    *)
+    print_endline @@ string_of_ty alloc_ty;
     (*arr_alloc_stream and ptr_Alloc ist other way round than in doc, but should work*)
-    (alloc_ty, Ll.Id(ll_arr_pointer_id), size_exp_stream@arr_alloc_stream@ptr_alloc_stream@arr_store_stream)
+    (alloc_ty, arr_alloc_id, size_exp_stream@arr_alloc_stream)
 
   | CArr(arr_ty, arr_elems) -> 
     let arr_elem_length = List.length arr_elems in
@@ -383,27 +387,30 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
 
   | Index (arr_exp, ind_exp) ->
     (*  %_arr12 = load { i64, [0 x i64] }*, { i64, [0 x i64] }** @arr   *)
-    let (arr_ty, arr_id, arr_stream) = cmp_exp c arr_exp in
+    let (arr_ty, arr_base_ptr, arr_stream) = cmp_exp c arr_exp in
+    (*
     let base_uid = gensym "arr_base_uid" in
     let load_arr_ptr_stream = [I(base_uid , Load(arr_ty, arr_id))] in
+    *)
 
     (* %_index_ptr14 = getelementptr { i64, [0 x i64] }, 
      { i64, [0 x i64] }* %_arr12, i32 0, i32 1, i32 2  *)
     let (_, ind_uid, ind_stream) = cmp_exp c ind_exp in
     let ind_ptr_id = gensym "ind_ptr_id" in
-    let gep_stream = [I(ind_ptr_id, Gep(arr_ty, Ll.Id(base_uid), [Const(0L); ind_uid]))] in
+    let gep_stream = [I(ind_ptr_id, Gep(arr_ty, arr_base_ptr, [Const(0L); Const(1L); ind_uid]))] in
 
     (*  %_index15 = load i64, i64* %_index_ptr14  *)
-    let elem_id = gensym "ind_ptr_id" in
+    let elem_id = gensym "elem_id" in
+    print_endline @@ string_of_ty arr_ty;
     let inner_type = 
     begin match arr_ty with
-      | Array(_,ty) -> ty
-      | _ -> failwith "No Array type"
+      | Ptr(Struct([I64; Array(n,t)])) -> t 
+      | _ -> failwith "wrong inner type"
     end 
     in
     let load_elem_stream = [I(elem_id , Load(inner_type , Ll.Id(ind_ptr_id)))] in
 
-    (arr_ty, Ll.Id(elem_id), arr_stream@load_arr_ptr_stream@gep_stream@load_elem_stream)
+    (inner_type, Ll.Id(elem_id), arr_stream@ind_stream@gep_stream@load_elem_stream)
   
   | Call (e1, arg_list) -> 
       (* lookup function label and type*)
