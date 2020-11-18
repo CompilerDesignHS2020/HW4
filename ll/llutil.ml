@@ -22,7 +22,7 @@ let sot = string_of_ty
 
 let dptr = function
   | Ptr t -> t
-  | _ -> failwith "PP: expected pointer type"
+  | t -> print_endline (string_of_ty t);failwith "PP: expected pointer type"
 
 let string_of_operand : operand -> string = function
   | Null    -> "null"
